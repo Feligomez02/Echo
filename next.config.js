@@ -1,10 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Disable Turbopack to use Webpack (better module resolution on Vercel)
-  experimental: {
-    turbopack: false,
-  },
-
   // Security: Disable X-Powered-By header
   poweredByHeader: false,
 
