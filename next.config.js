@@ -24,9 +24,6 @@ const nextConfig = {
     optimizePackageImports: ['@nextui-org/react'],
   },
 
-  // Output standalone for better Vercel compatibility
-  output: 'standalone',
-
   // Image optimization
   images: {
     // Use remotePatterns instead of deprecated domains for security
