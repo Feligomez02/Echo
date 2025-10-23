@@ -1,12 +1,9 @@
 {
-  "buildCommand": "prisma generate && next build --no-turbopack",
   "framework": "nextjs",
   "installCommand": "npm ci --legacy-peer-deps",
+  "buildCommand": "npm run build",
   "functions": {
     "app/api/**/*.js": {
-      "includeFiles": "node_modules/@prisma/client/**"
-    },
-    "app/api/**/*.ts": {
       "includeFiles": "node_modules/@prisma/client/**"
     }
   },
