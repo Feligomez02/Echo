@@ -58,6 +58,7 @@ export async function GET(request: Request) {
     return NextResponse.json(showsWithRatings);
   } catch (error) {
     // Log error on server-side only (not exposed to client)
+    console.error('Error in /api/shows:', error);
     return NextResponse.json(
       { error: 'Error al obtener shows' },
       { status: 500 }
