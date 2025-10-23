@@ -4,8 +4,8 @@
   "description": "Echo - Reviews de shows en vivo en Córdoba",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "node scripts/clean-prisma.js && prisma generate && next build",
+  "dev": "next dev --webpack",
+  "build": "node scripts/clean-prisma.js && prisma generate && next build --webpack",
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "next lint",
