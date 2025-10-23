@@ -10,10 +10,5 @@
       "path": "/api/cron/scrape",
       "schedule": "0 2 * * 0"
     }
-  ],
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "runtime": "nodejs"
-    }
-  }
+  ]
 }
