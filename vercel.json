@@ -2,9 +2,6 @@
   "buildCommand": "npm run build",
   "framework": "nextjs",
   "installCommand": "npm ci --legacy-peer-deps && npm run prisma:generate",
-  "env": {
-    "DATABASE_URL": "file:./dev.db"
-  },
   "crons": [
     {
       "path": "/api/cron/scrape",
