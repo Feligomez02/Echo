@@ -3,20 +3,9 @@ const nextConfig = {
   // Security: Disable X-Powered-By header
   poweredByHeader: false,
 
-  // Experimental features for better compatibility
+  // Disable Turbopack to use Webpack (better module resolution)
   experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', 'prisma']
-  },
-
-  // Webpack configuration for better Prisma handling
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals.push({
-        '@prisma/client': '@prisma/client',
-        'prisma': 'prisma'
-      });
-    }
-    return config;
+    turbopack: false,
   },
 
   // Image optimization
