@@ -1,6 +1,7 @@
 {
-  "buildCommand": "npm install --legacy-peer-deps && prisma generate && next build",
+  "buildCommand": "npm ci --legacy-peer-deps && prisma generate && next build",
   "framework": "nextjs",
+  "installCommand": "npm ci --legacy-peer-deps",
   "crons": [
     {
       "path": "/api/cron/scrape",
