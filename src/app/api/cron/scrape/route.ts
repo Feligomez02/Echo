@@ -1,5 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 
+export const runtime = 'nodejs';
+
 /**
  * Vercel Cron Endpoint - Runs weekly to scrape new events
  * 
