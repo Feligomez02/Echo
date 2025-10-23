@@ -3,7 +3,8 @@
 
 A modern social platform for discovering and reviewing live concerts and shows at La Estación and La Fábrica in Córdoba, Argentina.
 
-**Built with:** Next.js 16 • React 19 • TypeScript • Tailwind CSS  
+**Built with:** Next.js 16 • React 19 • TypeScript • Tailwind CSS
+<!-- Force redeploy: 2025-10-23 -->  
 **Target Audience:** 18-40 years old  
 **Status:** ✅ Production Ready
 

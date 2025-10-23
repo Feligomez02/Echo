@@ -3,6 +3,22 @@ const nextConfig = {
   // Security: Disable X-Powered-By header
   poweredByHeader: false,
 
+  // Experimental features for better compatibility
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client', 'prisma']
+  },
+
+  // Webpack configuration for better Prisma handling
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push({
+        '@prisma/client': '@prisma/client',
+        'prisma': 'prisma'
+      });
+    }
+    return config;
+  },
+
   // Image optimization
   images: {
     // Use remotePatterns instead of deprecated domains for security
