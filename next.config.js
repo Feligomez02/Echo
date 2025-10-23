@@ -15,6 +15,9 @@ const nextConfig = {
     return config;
   },
 
+  // Add empty turbopack config to acknowledge we're using webpack
+  turbopack: {},
+
   // Output standalone for better Vercel compatibility
   output: 'standalone',
 
