@@ -5,9 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/copy-prisma-binaries.js && next build",
     "start": "next start",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node scripts/copy-prisma-binaries.js",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
