@@ -6,6 +6,13 @@ const nextConfig = {
   // Security: Disable X-Powered-By header
   poweredByHeader: false,
 
+  // Disable Turbopack and force Webpack for Prisma compatibility
+  experimental: {
+    turbopack: false,
+    // Don't optimize @prisma/client imports - it interferes with binary loading
+    optimizePackageImports: ['@nextui-org/react'],
+  },
+
   // Ensure Prisma query engine is bundled for serverless deployment
   webpack: (config, { isServer }) => {
     if (isServer) {
@@ -13,15 +20,6 @@ const nextConfig = {
       config.plugins = [...config.plugins, new PrismaPlugin()];
     }
     return config;
-  },
-
-  // Add empty turbopack config to acknowledge we're using webpack
-  turbopack: {},
-
-  // Experimental features
-  experimental: {
-    // Don't optimize @prisma/client imports - it interferes with binary loading
-    optimizePackageImports: ['@nextui-org/react'],
   },
 
   // Image optimization
