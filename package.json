@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "build:vercel": "DATABASE_URL=file:./dev.db prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
