@@ -1,6 +1,6 @@
 {
   "name": "echo-app",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Echo - Reviews de shows en vivo en Córdoba",
   "private": true,
   "scripts": {

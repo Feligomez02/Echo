@@ -27,3 +27,5 @@ if (fs.existsSync(runtimeDir)) {
     }
   });
 }
+
+console.log('🎯 Prisma cache cleaned successfully');
