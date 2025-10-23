@@ -44,7 +44,6 @@
     "dompurify": "^3.0.8",
     "framer-motion": "^11.0.3",
     "is-plain-object": "^5.0.0",
-    "isomorphic-dompurify": "^2.9.0",
     "leaflet": "^1.9.4",
     "next": "^16.0.0",
     "next-auth": "^4.24.5",
