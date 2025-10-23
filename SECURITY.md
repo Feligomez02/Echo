@@ -694,3 +694,76 @@ Esta aplicación implementa **múltiples capas de seguridad** para proteger cont
 7. ✅ **Input Validation**: Zod + sanitización múltiple
 
 **Estado de producción**: ✅ Listo con mejoras recomendadas para escala.
+
+---
+
+## 🚀 Security for Deployment
+
+### Variables de Entorno en Producción
+
+**NUNCA commitear estos valores a Git:**
+
+```env
+# ✅ Generate with: openssl rand -base64 32
+NEXTAUTH_SECRET=your-secret-here
+
+# ✅ Set in Vercel dashboard
+DATABASE_URL=postgresql://...
+
+# ✅ For cron scraper security
+SCRAPER_API_KEY=your-scraper-key
+```
+
+### Checklist Pre-Deployment
+
+- [ ] NEXTAUTH_SECRET generado y único
+- [ ] DATABASE_URL usa contraseña fuerte (min 16 chars, mixed + numbers + symbols)
+- [ ] NEXTAUTH_URL coincide con dominio real (sin typos)
+- [ ] Todos los .env* en .gitignore
+- [ ] No hay console.logs de datos sensibles
+- [ ] Backup de BD configurado
+- [ ] HTTPS habilitado (automático en Vercel)
+- [ ] Rate limiting configurado
+
+### Monitoreo en Producción
+
+- **Intentos de auth fallidos**: Indicador de ataque de fuerza bruta
+- **Rate limit violations**: Posible DDoS o scraping malicioso
+- **Errores de BD**: Anomalías en acceso de datos
+- **Tiempos de respuesta lentos**: Potencial DDoS
+
+### Rotación de Secrets
+
+**Cada 3 meses:**
+1. Generar nuevo NEXTAUTH_SECRET
+2. Actualizar en Vercel
+3. Redeploy automático
+4. Monitorear logs
+5. Archivar secret antiguo
+
+**En caso de compromiso:**
+1. Rotar secretos inmediatamente
+2. Revisar logs de acceso
+3. Forzar logout de todas las sesiones
+4. Auditar código
+5. Notificar usuarios si es necesario
+
+---
+
+## ✅ Conclusión Final
+
+Esta aplicación implementa **múltiples capas de seguridad**:
+
+1. ✅ **XSS**: DOMPurify sanitiza todo HTML
+2. ✅ **SQL Injection**: Prisma + validación de IDs
+3. ✅ **IDOR**: Verificación de ownership
+4. ✅ **Rate Limiting**: Protección contra abuse
+5. ✅ **Auth**: Contraseñas fuertes + bcrypt
+6. ✅ **Headers**: Security headers completos
+7. ✅ **Input Validation**: Zod + sanitización
+8. ✅ **Environment Variables**: No hardcoded secrets
+9. ✅ **Cron Security**: SCRAPER_API_KEY protection
+
+**Deployment**: Ver [DEPLOYMENT.md](./DEPLOYMENT.md) para guía completa.
+
+```

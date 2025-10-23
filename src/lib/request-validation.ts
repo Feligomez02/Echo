@@ -65,8 +65,10 @@ export async function validateSecureRequest(
     if (!signature) {
       errors.push('Missing signature header');
     } else {
-      const secret = process.env.NEXTAUTH_SECRET || 'fallback-secret';
-      if (!verifyRequestSignature(body, signature, secret)) {
+      const secret = process.env.NEXTAUTH_SECRET;
+      if (!secret) {
+        errors.push('Server configuration error: NEXTAUTH_SECRET not set');
+      } else if (!verifyRequestSignature(body, signature, secret)) {
         errors.push('Invalid signature (possible tampering detected)');
       }
     }
@@ -196,7 +198,10 @@ export function generateSecureHeaders(body?: any): Record<string, string> {
 
   // Si hay body, generar firma
   if (body) {
-    const secret = process.env.NEXTAUTH_SECRET || 'fallback-secret';
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (!secret) {
+      throw new Error('NEXTAUTH_SECRET not configured');
+    }
     headers['X-Signature'] = generateRequestSignature(body, secret);
   }
 
