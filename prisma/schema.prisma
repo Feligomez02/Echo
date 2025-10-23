@@ -4,7 +4,6 @@
 generator client {
   provider = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
-  output = "../node_modules/.prisma/client"
 }
 
 // Force cache invalidation - build 2025-10-23

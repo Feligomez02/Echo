@@ -18,6 +18,12 @@ const nextConfig = {
   // Add empty turbopack config to acknowledge we're using webpack
   turbopack: {},
 
+  // Experimental features
+  experimental: {
+    // Don't optimize @prisma/client imports - it interferes with binary loading
+    optimizePackageImports: ['@nextui-org/react'],
+  },
+
   // Output standalone for better Vercel compatibility
   output: 'standalone',
 
