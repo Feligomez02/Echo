@@ -1,12 +1,22 @@
+const path = require('path');
+const { PrismaPlugin } = require('@prisma/nextjs-monorepo-workaround-plugin');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Security: Disable X-Powered-By header
   poweredByHeader: false,
 
-  // Disable Turbopack to use Webpack (better module resolution)
-  experimental: {
-    turbopack: false,
+  // Ensure Prisma query engine is bundled for serverless deployment
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Add PrismaPlugin to copy query engine files
+      config.plugins = [...config.plugins, new PrismaPlugin()];
+    }
+    return config;
   },
+
+  // Output standalone for better Vercel compatibility
+  output: 'standalone',
 
   // Image optimization
   images: {
