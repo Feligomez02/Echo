@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 250, 250, 250;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+}
+
+/* Nostalgic/Vintage Styles */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Retro Paper Card Effect */
+  .retro-card {
+    @apply bg-amber-50 dark:bg-slate-800 border-2 border-amber-100 dark:border-slate-700 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] dark:shadow-[4px_4px_0px_rgba(0,0,0,0.5)] transition-all hover:shadow-[6px_6px_0px_rgba(0,0,0,0.15)] dark:hover:shadow-[6px_6px_0px_rgba(0,0,0,0.6)];
+  }
+
+  /* Vintage Poster Style */
+  .vintage-poster {
+    @apply bg-gradient-to-br from-amber-100 via-orange-50 to-yellow-50 dark:from-slate-900 dark:via-amber-900 dark:to-slate-900 border-4 border-amber-800 dark:border-amber-700 shadow-lg;
+  }
+
+  /* Analog Tape Look */
+  .tape-lines {
+    background-image: 
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+  }
+
+  /* Retro Button */
+  .retro-button {
+    @apply bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 border-2 border-amber-800 rounded shadow-[3px_3px_0px_rgba(0,0,0,0.2)] transition-all active:shadow-[1px_1px_0px_rgba(0,0,0,0.2)] active:translate-x-0.5 active:translate-y-0.5;
+  }
+
+  /* Film Strip Border */
+  .film-strip {
+    @apply relative;
+  }
+
+  .film-strip::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 bottom-0 pointer-events-none;
+    background-image: 
+      repeating-linear-gradient(
+        90deg,
+        #222 0px,
+        #222 10px,
+        transparent 10px,
+        transparent 20px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        #222 0px,
+        #222 10px,
+        transparent 10px,
+        transparent 20px
+      );
+    background-position: top left, left top;
+    background-size: 20px 100%, 100% 20px;
+    background-repeat: repeat;
+  }
+
+  /* Vinyl Record Label */
+  .vinyl-label {
+    @apply relative rounded-full aspect-square flex items-center justify-center shadow-2xl;
+    background: conic-gradient(from 0deg, #1a1a1a 0deg, #333 120deg, #1a1a1a 240deg, #1a1a1a);
+  }
+
+  /* Concert Poster Text */
+  .poster-title {
+    @apply text-4xl md:text-6xl font-black italic text-amber-900 dark:text-amber-100 drop-shadow-lg;
+    letter-spacing: -0.02em;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  }
+
+  /* Handwritten Feel */
+  .handwritten {
+    font-family: 'Comic Sans MS', 'Trebuchet MS', cursive;
+    @apply text-amber-900 dark:text-amber-100;
+  }
+
+  /* Typewriter Effect */
+  .typewriter {
+    font-family: 'Courier New', monospace;
+    @apply border-l-4 border-amber-900 dark:border-amber-100 pl-2;
+  }
+}

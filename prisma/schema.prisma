@@ -1,0 +1,156 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  password      String
+  name          String?
+  bio           String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  reviews       Review[]
+  comments      Comment[]
+  reviewLikes   ReviewLike[]
+  favorites     UserFavorite[]
+  
+  // Friendships where this user is the follower
+  following     Friendship[] @relation("UserFollowing")
+  // Friendships where this user is being followed
+  followers     Friendship[] @relation("UserFollowers")
+}
+
+model Show {
+  id            String    @id @default(cuid())
+  name          String
+  artist        String
+  description   String?
+  date          DateTime
+  venue         String
+  venueId       String?   // Reference to Venue model
+  city          String    @default("Córdoba")
+  imageUrl      String?
+  ticketUrl     String?
+  source        String    // "estacion", "fabrica", etc.
+  externalId    String?   // ID from external source
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  reviews       Review[]
+  favorites     UserFavorite[]
+  venueRef      Venue?    @relation(fields: [venueId], references: [id])
+
+  @@index([date])
+  @@index([artist])
+  @@index([venue])
+  @@index([source])
+  @@unique([externalId, source])
+}
+
+model Venue {
+  id            String    @id @default(cuid())
+  name          String    @unique
+  city          String    @default("Córdoba")
+  address       String?
+  website       String?
+  source        String    // "estacion", "fabrica", etc.
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  shows         Show[]
+
+  @@index([city])
+  @@index([active])
+}
+
+model Review {
+  id            String    @id @default(cuid())
+  userId        String
+  showId        String
+  rating        Float     // 1.0 to 5.0, allows 0.5 increments
+  text          String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  show          Show      @relation(fields: [showId], references: [id], onDelete: Cascade)
+  comments      Comment[]
+  likes         ReviewLike[]
+
+  @@index([userId])
+  @@index([showId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id            String    @id @default(cuid())
+  reviewId      String
+  userId        String
+  text          String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  review        Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@index([userId])
+}
+
+model ReviewLike {
+  id            String    @id @default(cuid())
+  reviewId      String
+  userId        String
+  isLike        Boolean   // true for like, false for dislike
+  createdAt     DateTime  @default(now())
+
+  review        Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, userId])
+  @@index([reviewId])
+  @@index([userId])
+}
+
+model Friendship {
+  id            String    @id @default(cuid())
+  followerId    String
+  followingId   String
+  status        String    @default("pending") // pending, accepted
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  follower      User      @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following     User      @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model UserFavorite {
+  id            String    @id @default(cuid())
+  userId        String
+  showId        String
+  order         Int       @default(0) // For ordering the 5 favorites
+  createdAt     DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  show          Show      @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, showId])
+  @@index([userId])
+}
