@@ -1,13 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+/**
+ * DEPRECATED: Prisma has been fully migrated to Supabase.
+ * This file is kept only for backward compatibility with CLI scripts.
+ * The application no longer uses Prisma - all endpoints use Supabase.
+ * 
+ * For new code, use @/lib/supabase instead.
+ */
 
-declare global {
-  var prisma: any;
-}
-
-export const prisma = globalThis.prisma || new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.prisma = prisma;
-}
+// Stub export for scripts that still reference this file
+export const prisma = null;
