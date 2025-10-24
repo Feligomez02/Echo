@@ -2,7 +2,6 @@
   "framework": "nextjs",
   "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build",
-  "includeFiles": "node_modules/@prisma/**",
   "env": {
     "PRISMA_SKIP_ENGINE_CHECK": "true"
   },
