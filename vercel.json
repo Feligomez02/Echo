@@ -6,7 +6,9 @@
     "PRISMA_SKIP_ENGINE_CHECK": "true"
   },
   "functions": {
-    "app/api/**/*.js": {}
+    "app/api/**/*.js": {
+      "includeFiles": "node_modules/@prisma/**"
+    }
   },
   "crons": [
     {
