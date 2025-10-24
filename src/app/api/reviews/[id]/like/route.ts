@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
+import { generateUUID } from '@/lib/uuid';
 
 const likeSchema = z.object({
   isLike: z.boolean(),
@@ -76,9 +77,11 @@ export async function POST(
     }
 
     // Crear nuevo like
+    const likeId = generateUUID();
     const { data: like, error: createError } = await supabase
       .from('ReviewLike')
       .insert({
+        id: likeId,
         reviewId,
         userId,
         isLike,

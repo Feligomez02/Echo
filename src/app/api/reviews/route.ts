@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
+import { generateUUID } from '@/lib/uuid';
 import { sanitizeHtml, checkRateLimit, isValidCuid } from '@/lib/security';
 import { checkPermission } from '@/lib/authorization';
 import { validateReviewParams, logSuspiciousActivity } from '@/lib/request-validation';
@@ -162,9 +163,11 @@ export async function POST(request: Request) {
 
     console.log('📝 About to create review with:', { userId, showId, rating, text: text.substring(0, 50) });
 
+    const reviewId = generateUUID();
     const { data: review, error: createError } = await supabase
       .from('Review')
       .insert({
+        id: reviewId,
         userId,
         showId,
         rating,

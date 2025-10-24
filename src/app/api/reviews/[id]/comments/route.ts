@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
+import { generateUUID } from '@/lib/uuid';
 import { sanitizeHtml, checkRateLimit, isValidCuid } from '@/lib/security';
 import { checkPermission } from '@/lib/authorization';
 
@@ -62,9 +63,11 @@ export async function POST(
     const sanitizedText = sanitizeHtml(text);
 
     // Crear comentario
+    const commentId = generateUUID();
     const { data: comment, error } = await supabase
       .from('Comment')
       .insert({
+        id: commentId,
         reviewId,
         userId,
         text: sanitizedText,

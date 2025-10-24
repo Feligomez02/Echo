@@ -5,9 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
-    "postinstall": "prisma generate",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
@@ -34,8 +33,6 @@
   },
   "dependencies": {
     "@nextui-org/react": "^2.2.10",
-    "@prisma/client": "^5.9.1",
-    "@prisma/nextjs-monorepo-workaround-plugin": "^6.18.0",
     "@supabase/supabase-js": "^2.76.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/leaflet": "^1.9.20",
@@ -46,14 +43,12 @@
     "bcryptjs": "^2.4.3",
     "dompurify": "^3.0.8",
     "framer-motion": "^11.0.3",
-    "is-plain-object": "^5.0.0",
     "leaflet": "^1.9.4",
     "next": "^16.0.0",
     "next-auth": "^4.24.5",
     "next-safe-action": "^6.0.0",
     "next-themes": "^0.2.1",
     "postcss": "^8",
-    "prisma": "^5.9.1",
     "puppeteer": "^24.23.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
@@ -66,10 +61,14 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@prisma/client": "^5.9.1",
+    "@prisma/nextjs-monorepo-workaround-plugin": "^6.18.0",
     "@types/dompurify": "^3.0.5",
+    "@types/uuid": "^11.0.0",
     "eslint": "^8",
     "eslint-config-next": "14.1.0",
     "prettier": "^3.2.5",
+    "prisma": "^5.9.1",
     "tsx": "^4.20.6"
   },
   "prettier": {

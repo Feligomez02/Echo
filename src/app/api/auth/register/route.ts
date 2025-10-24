@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
+import { generateUUID } from '@/lib/uuid';
 import {
   sanitizeUsername,
   sanitizeText,
@@ -96,10 +97,12 @@ export async function POST(request: Request) {
     // Hash de la contraseña con rounds aumentado para más seguridad
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Crear usuario
+    // Crear usuario con ID UUID generado
+    const userId = generateUUID();
     const { data: user, error: createError } = await supabase
       .from('User')
       .insert({
+        id: userId,
         email,
         username: sanitizedUsername,
         password: hashedPassword,
