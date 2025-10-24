@@ -76,6 +76,9 @@ export async function GET(
       ...show,
       reviews: reviews || [],
       favorites: favorites || [],
+      _count: {
+        reviews: reviews?.length || 0,
+      },
       averageRating,
     });
   } catch (error) {
