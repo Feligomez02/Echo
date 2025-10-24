@@ -1,9 +1,7 @@
 import { supabase } from '@/lib/supabase';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-// Agregar el plugin stealth para evitar detección
-puppeteer.use(StealthPlugin());
+// Lazy-load puppeteer to avoid loading heavy dependencies at module import time
+// This file only defines interfaces and types, puppeteer is loaded when functions are called
 
 export interface ScrapedShow {
   name: string;
@@ -107,6 +105,12 @@ function normalizePasslineEvent(event: PasslineEvent): ScrapedShow | null {
  * Scrapea eventos de Passline usando Puppeteer para manejar Cloudflare
  */
 export async function scrapePassline(): Promise<ScrapedShow[]> {
+  // Load puppeteer only when function is called (lazy loading)
+  const puppeteer = (await import('puppeteer-extra')).default;
+  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
+  
+  puppeteer.use(StealthPlugin());
+
   console.log('🚀 Launching browser to bypass Cloudflare...');
   
   const browser = await puppeteer.launch({

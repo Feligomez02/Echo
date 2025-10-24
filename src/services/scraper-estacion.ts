@@ -1,15 +1,18 @@
 import { supabase } from '@/lib/supabase';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { ScrapedShow } from './scraper-puppeteer';
-
-// Agregar el plugin stealth para evitar detección
-puppeteer.use(StealthPlugin());
 
 /**
  * Scrapea eventos de La Estación Córdoba
+ * Lazy-loads puppeteer to avoid loading heavy dependencies at module import time
  */
 export async function scrapeEstacion(): Promise<ScrapedShow[]> {
+  // Load puppeteer only when function is called
+  const puppeteer = (await import('puppeteer-extra')).default;
+  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
+  
+  // Agregar el plugin stealth para evitar detección
+  puppeteer.use(StealthPlugin());
+
   console.log('🚉 Scraping La Estación Córdoba...');
   
   const browser = await puppeteer.launch({
@@ -88,8 +91,8 @@ export async function scrapeEstacion(): Promise<ScrapedShow[]> {
         else if (fontWeight === '400' && text.length > 0 && !isDate && !isVenue) {
           // Solo agregar si ya tenemos fecha y venue (es parte del lineup)
           if (currentShow.hasDate && currentShow.venues.length > 0) {
-            const ignoredTexts = /^(LA ESTACION|OUTDOOR|INDOOR|NUESTRAS MARCAS|SEGUINOS)$/i;
-            if (!ignoredTexts.test(text) && text.length < 50) {
+            const ignoredTextos = /^(LA ESTACION|OUTDOOR|INDOOR|NUESTRAS MARCAS|SEGUINOS)$/i;
+            if (!ignoredTextos.test(text) && text.length < 50) {
               currentShow.artists.push(text);
             }
           }
