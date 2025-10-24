@@ -37,9 +37,17 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     // Get followers/following counts separately for each user
-    let usersWithCounts = users || [];
+    let usersWithCounts = (users || []).map((user: any) => ({
+      ...user,
+      _count: {
+        followers: 0,
+        following: 0,
+        reviews: user.reviews?.length || 0,
+      },
+    }));
     
-    for (let user of usersWithCounts) {
+    for (let i = 0; i < usersWithCounts.length; i++) {
+      const user = usersWithCounts[i];
       const { count: followersCount } = await supabase
         .from('Friendship')
         .select('*', { count: 'exact', head: true })
@@ -50,10 +58,10 @@ export async function GET(request: NextRequest) {
         .select('*', { count: 'exact', head: true })
         .eq('followerId', user.id);
 
-      user._count = {
+      usersWithCounts[i]._count = {
         followers: followersCount || 0,
         following: followingCount || 0,
-        reviews: 0,
+        reviews: user.reviews?.length || 0,
       };
     }
 
@@ -66,18 +74,14 @@ export async function GET(request: NextRequest) {
     if (countError) throw countError;
 
     // Format response
-    const formattedUsers = usersWithCounts.map(user => ({
+    const formattedUsers = usersWithCounts.map((user: any) => ({
       id: user.id,
       username: user.username,
       name: user.name,
       image: user.image,
       bio: user.bio,
       createdAt: user.createdAt,
-      _count: (user as any)._count || {
-        followers: 0,
-        following: 0,
-        reviews: user.reviews?.length || 0,
-      },
+      _count: user._count,
     }));
 
     return NextResponse.json({
