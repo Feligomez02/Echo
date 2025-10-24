@@ -2,9 +2,6 @@
   "framework": "nextjs",
   "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build",
-  "env": {
-    "PRISMA_SKIP_ENGINE_CHECK": "true"
-  },
   "crons": [
     {
       "path": "/api/cron/scrape",

@@ -1,27 +1,9 @@
 const path = require('path');
-const { PrismaPlugin } = require('@prisma/nextjs-monorepo-workaround-plugin');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Security: Disable X-Powered-By header
   poweredByHeader: false,
-
-  // Disable Turbopack and force Webpack for Prisma compatibility
-  experimental: {
-    turbopack: false,
-    // Don't optimize @prisma/client imports - it interferes with binary loading
-    optimizePackageImports: ['@nextui-org/react'],
-  },
-
-  // Ensure Prisma query engine is bundled for serverless deployment
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Externalize Prisma packages - don't bundle them, load at runtime
-      config.externals = config.externals || [];
-      config.externals.push('@prisma/client', '@prisma/engines');
-    }
-    return config;
-  },
 
   // Image optimization
   images: {
