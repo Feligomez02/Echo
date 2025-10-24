@@ -1,3 +1,14 @@
+// Load environment variables for Node.js scripts
+if (typeof window === 'undefined') {
+  try {
+    const dotenv = require('dotenv');
+    dotenv.config({ path: '.env' });
+    dotenv.config({ path: '.env.local' });
+  } catch (e) {
+    // dotenv not available in browser
+  }
+}
+
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!

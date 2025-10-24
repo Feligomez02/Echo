@@ -54,11 +54,16 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
- * Valida que un ID sea un CUID válido (formato usado por Prisma)
+ * Valida que un ID sea un UUID o CUID válido
+ * - UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+ * - CUID: c[a-z0-9]{24}
  */
 export function isValidCuid(id: string): boolean {
+  // UUID v4 format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // CUID format (legacy)
   const cuidRegex = /^c[a-z0-9]{24}$/;
-  return cuidRegex.test(id);
+  return uuidRegex.test(id) || cuidRegex.test(id);
 }
 
 /**

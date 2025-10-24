@@ -3,6 +3,11 @@
  * y guardar los eventos en Supabase (local y production)
  */
 
+// Load environment variables from .env and .env.local
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env' });
+dotenv.config({ path: '.env.local' });
+
 import { scrapeEstacion } from '../services/scraper-estacion';
 import { scrapeFabrica } from '../services/scraper-fabrica';
 
@@ -10,13 +15,9 @@ async function saveShowsToSupabase(shows: any[], venue: string) {
   console.log(`\n📤 Sending ${shows.length} shows from ${venue} to Supabase...`);
   
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const scraperKey = process.env.SCRAPER_API_KEY;
-
-    if (!scraperKey) {
-      console.error('❌ SCRAPER_API_KEY not set in environment variables');
-      return { created: 0, updated: 0, skipped: 0 };
-    }
+    // Use production URL by default for scraper uploads
+    const apiUrl = 'https://echo-e8dt.vercel.app';
+    const scraperKey = 'Qoh09wVDWFqChfghw6CF2cfLjv6XrOIVhcqpBuaaxHg=';
 
     const response = await fetch(`${apiUrl}/api/admin/scrape/save`, {
       method: 'POST',
