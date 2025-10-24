@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 
 const likeSchema = z.object({
@@ -28,11 +28,13 @@ export async function POST(
     const { isLike } = likeSchema.parse(body);
 
     // Verificar que la review existe
-    const review = await prisma.review.findUnique({
-      where: { id: reviewId },
-    });
+    const { data: review, error: reviewError } = await supabase
+      .from('Review')
+      .select('id')
+      .eq('id', reviewId)
+      .single();
 
-    if (!review) {
+    if (reviewError || !review) {
       return NextResponse.json(
         { error: 'Review no encontrada' },
         { status: 404 }
@@ -42,56 +44,54 @@ export async function POST(
     const userId = (session.user as any).id;
 
     // Verificar si ya existe un like de este usuario
-    const existingLike = await prisma.reviewLike.findUnique({
-      where: {
-        reviewId_userId: {
-          reviewId,
-          userId,
-        },
-      },
-    });
+    const { data: existingLike, error: existingError } = await supabase
+      .from('ReviewLike')
+      .select('*')
+      .eq('reviewId', reviewId)
+      .eq('userId', userId)
+      .single();
 
-    if (existingLike) {
+    if (existingLike && !existingError) {
       // Si es el mismo tipo de reacción, eliminar
       if (existingLike.isLike === isLike) {
-        await prisma.reviewLike.delete({
-          where: {
-            reviewId_userId: {
-              reviewId,
-              userId,
-            },
-          },
-        });
+        await supabase
+          .from('ReviewLike')
+          .delete()
+          .eq('reviewId', reviewId)
+          .eq('userId', userId);
         return NextResponse.json({ message: 'Reacción eliminada' });
       }
 
       // Si es diferente, actualizar
-      const updated = await prisma.reviewLike.update({
-        where: {
-          reviewId_userId: {
-            reviewId,
-            userId,
-          },
-        },
-        data: {
-          isLike,
-        },
-      });
+      const { data: updated, error: updateError } = await supabase
+        .from('ReviewLike')
+        .update({ isLike })
+        .eq('reviewId', reviewId)
+        .eq('userId', userId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
       return NextResponse.json(updated);
     }
 
     // Crear nuevo like
-    const like = await prisma.reviewLike.create({
-      data: {
+    const { data: like, error: createError } = await supabase
+      .from('ReviewLike')
+      .insert({
         reviewId,
         userId,
         isLike,
-      },
-    });
+        createdAt: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (createError) throw createError;
 
     return NextResponse.json(like, { status: 201 });
   } catch (error) {
-    // Log error on server-side only
+    console.error('Error processing like:', error);
     return NextResponse.json(
       { error: 'Error al procesar reacción' },
       { status: 500 }

@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { sanitizeHtml, checkRateLimit, isValidCuid } from '@/lib/security';
 import { checkPermission } from '@/lib/authorization';
@@ -22,66 +22,36 @@ export async function GET(request: Request) {
     const showId = searchParams.get('showId');
     const userId = searchParams.get('userId');
 
-    const where: any = {};
-    if (showId) where.showId = showId;
-    if (userId) where.userId = userId;
+    let query = supabase
+      .from('Review')
+      .select(`
+        *,
+        user:User(id, username, name, image),
+        show:Show(id, name, artist, date, venue),
+        likes:ReviewLike(userId, isLike),
+        comments:Comment(
+          *,
+          user:User(id, username, name, image)
+        )
+      `)
+      .order('createdAt', { ascending: false })
+      .limit(50);
 
-    const reviews = await prisma.review.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            image: true,
-          },
-        },
-        show: {
-          select: {
-            id: true,
-            name: true,
-            artist: true,
-            date: true,
-            venue: true,
-          },
-        },
-        likes: {
-          select: {
-            userId: true,
-            isLike: true,
-          },
-        },
-        comments: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                name: true,
-                image: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 50,
-    });
+    if (showId) {
+      query = query.eq('showId', showId);
+    }
 
-    return NextResponse.json(reviews);
+    if (userId) {
+      query = query.eq('userId', userId);
+    }
+
+    const { data: reviews, error } = await query;
+
+    if (error) throw error;
+
+    return NextResponse.json(reviews || []);
   } catch (error) {
-    // Log error on server-side only
+    console.error('Error in /api/reviews GET:', error);
     return NextResponse.json(
       { error: 'Error al obtener reviews' },
       { status: 500 }
@@ -100,11 +70,9 @@ export async function POST(request: Request) {
 
     const userId = (session.user as any).id;
 
-    // Debug: Log the userId
     console.log('📝 Creating review - session:', JSON.stringify(session.user, null, 2));
     console.log('📝 Creating review - userId:', userId);
 
-    // Validar que userId existe
     if (!userId) {
       console.error('❌ userId is missing from session');
       return NextResponse.json(
@@ -126,7 +94,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { showId, rating, text } = reviewSchema.parse(body);
 
-    // ⚠️ PROTECCIÓN CONTRA PROXY TAMPERING
     // Validar todos los parámetros antes de procesar
     const paramValidation = validateReviewParams({ rating, text, showId });
     if (!paramValidation.valid) {
@@ -162,29 +129,30 @@ export async function POST(request: Request) {
     }
 
     // Verificar que el show existe
-    const show = await prisma.show.findUnique({
-      where: { id: showId },
-    });
+    const { data: show, error: showError } = await supabase
+      .from('Show')
+      .select('id, name')
+      .eq('id', showId)
+      .single();
 
-    console.log('📝 Review data - userId:', userId, ', showId:', showId);
-    console.log('📝 Show found:', show?.name);
-
-    // Verificar que el usuario existe
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      console.error('❌ User not found in database:', userId);
+    if (showError || !show) {
       return NextResponse.json(
-        { error: 'Usuario no encontrado' },
+        { error: 'Show no encontrado' },
         { status: 404 }
       );
     }
 
-    if (!show) {
+    // Verificar que el usuario existe
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      console.error('❌ User not found in database:', userId);
       return NextResponse.json(
-        { error: 'Show no encontrado' },
+        { error: 'Usuario no encontrado' },
         { status: 404 }
       );
     }
@@ -194,25 +162,24 @@ export async function POST(request: Request) {
 
     console.log('📝 About to create review with:', { userId, showId, rating, text: text.substring(0, 50) });
 
-    const review = await prisma.review.create({
-      data: {
+    const { data: review, error: createError } = await supabase
+      .from('Review')
+      .insert({
         userId,
         showId,
         rating,
         text: sanitizedText,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            image: true,
-          },
-        },
-        show: true,
-      },
-    });
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .select(`
+        *,
+        user:User(id, username, name, image),
+        show:Show(id, name, artist, date, venue)
+      `)
+      .single();
+
+    if (createError) throw createError;
 
     return NextResponse.json(review, { status: 201 });
   } catch (error) {
@@ -223,7 +190,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Log error on server-side only
     console.error('❌ Error creating review:', error);
     return NextResponse.json(
       { error: 'Error al crear review', details: String(error) },

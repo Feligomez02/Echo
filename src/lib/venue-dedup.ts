@@ -3,7 +3,7 @@
  * Handles cleaning and unifying venue names to prevent duplicates
  */
 
-import { prisma } from './prisma';
+import { supabase } from './supabase';
 
 /**
  * Common venue name variations and their canonical forms
@@ -138,17 +138,28 @@ function getEditDistance(s1: string, s2: string): number {
  * Get distinct venues from database
  */
 export async function getDistinctVenues(): Promise<string[]> {
-  const venues = await prisma.show.findMany({
-    distinct: ['venue'],
-    select: {
-      venue: true,
-    },
+  const { data: venues, error } = await supabase
+    .from('Show')
+    .select('venue', { count: 'exact' })
+    .limit(1);
+
+  if (error || !venues) {
+    return [];
+  }
+
+  // Get all unique venues
+  const { data: allVenues } = await supabase
+    .from('Show')
+    .select('venue');
+
+  const uniqueVenues = new Set<string>();
+  (allVenues || []).forEach((v: any) => {
+    if (v.venue && v.venue.length > 0) {
+      uniqueVenues.add(v.venue);
+    }
   });
 
-  return venues
-    .map((v: { venue: string }) => v.venue)
-    .filter((v: string) => v && v.length > 0)
-    .sort();
+  return Array.from(uniqueVenues).sort();
 }
 
 /**
@@ -237,12 +248,15 @@ export async function mergeVenueVariations(
 
   for (const variation of variations) {
     try {
-      const result = await prisma.show.updateMany({
-        where: { venue: variation },
-        data: { venue: canonicalName },
-      });
-      updated += result.count;
-      console.log(`   ✓ Merged "${variation}" into "${canonicalName}" (${result.count} shows)`);
+      const { error } = await supabase
+        .from('Show')
+        .update({ venue: canonicalName })
+        .eq('venue', variation);
+
+      if (error) throw error;
+      
+      updated++;
+      console.log(`   ✓ Merged "${variation}" into "${canonicalName}"`);
     } catch (error) {
       const errorMsg = `Failed to merge "${variation}": ${error instanceof Error ? error.message : String(error)}`;
       errors.push(errorMsg);
@@ -257,20 +271,27 @@ export async function mergeVenueVariations(
  * Get venue statistics
  */
 export async function getVenueStats() {
-  const venues = await prisma.show.groupBy({
-    by: ['venue'],
-    _count: true,
-    orderBy: {
-      _count: {
-        venue: 'desc',
-      },
-    },
+  const { data: venues, error } = await supabase
+    .from('Show')
+    .select('venue');
+
+  if (error || !venues) {
+    return [];
+  }
+
+  const venueCount = new Map<string, number>();
+  venues.forEach((v: any) => {
+    if (v.venue) {
+      venueCount.set(v.venue, (venueCount.get(v.venue) || 0) + 1);
+    }
   });
 
-  return venues.map((v: { venue: string; _count: number }) => ({
-    name: v.venue,
-    showCount: v._count,
-  }));
+  return Array.from(venueCount.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({
+      name,
+      showCount: count,
+    }));
 }
 
 /**

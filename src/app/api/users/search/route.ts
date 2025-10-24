@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,53 +18,55 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Buscar usuarios por username o nombre
-    const users = await prisma.user.findMany({
-      where: {
-        OR: [
-          { username: { contains: query } },
-          { name: { contains: query } },
-        ],
-      },
-      select: {
-        id: true,
-        username: true,
-        name: true,
-        image: true,
-        bio: true,
-        createdAt: true,
-        _count: {
-          select: {
-            followers: true,
-            following: true,
-            reviews: true,
-          },
-        },
-      },
-      take: limit,
-      skip: offset,
-      orderBy: [
-        { followers: { _count: 'desc' } }, // Primero los más seguidos
-        { createdAt: 'desc' }, // Luego los más recientes
-      ],
-    });
+    // Buscar usuarios por username o nombre (con case-insensitive)
+    const { data: users, error } = await supabase
+      .from('User')
+      .select(`
+        id,
+        username,
+        name,
+        image,
+        bio,
+        createdAt,
+        followers:Friendship(id,followerId),
+        following:Friendship(id,followingId),
+        reviews:Review(id)
+      `)
+      .or(`username.ilike.%${query}%,name.ilike.%${query}%`)
+      .order('createdAt', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
 
     // Contar total de resultados
-    const total = await prisma.user.count({
-      where: {
-        OR: [
-          { username: { contains: query } },
-          { name: { contains: query } },
-        ],
+    const { count: total, error: countError } = await supabase
+      .from('User')
+      .select('*', { count: 'exact', head: true })
+      .or(`username.ilike.%${query}%,name.ilike.%${query}%`);
+
+    if (countError) throw countError;
+
+    // Format response
+    const formattedUsers = (users || []).map(user => ({
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      image: user.image,
+      bio: user.bio,
+      createdAt: user.createdAt,
+      _count: {
+        followers: user.followers?.length || 0,
+        following: user.following?.length || 0,
+        reviews: user.reviews?.length || 0,
       },
-    });
+    }));
 
     return NextResponse.json({
-      users,
-      total,
+      users: formattedUsers,
+      total: total || 0,
       limit,
       offset,
-      hasMore: offset + limit < total,
+      hasMore: offset + limit < (total || 0),
     });
   } catch (error) {
     console.error('Error searching users:', error);

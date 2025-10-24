@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 // GET - Obtener perfil de usuario
 export async function GET(
@@ -11,82 +11,54 @@ export async function GET(
   context: { params: Promise<{ username: string }> }
 ) {
   try {
-    // Params para el nuevo compilador de nextjs
-    const {username} = await context.params;
+    const { username } = await context.params;
 
-    const user = await prisma.user.findUnique({
-      where: { username },
-      select: {
-        id: true,
-        username: true,
-        name: true,
-        bio: true,
-        image: true,
-        createdAt: true,
-        reviews: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                name: true,
-                image: true,
-              },
-            },
-            show: {
-              select: {
-                id: true,
-                name: true,
-                artist: true,
-                date: true,
-                venue: true,
-              },
-            },
-            likes: true,
-            _count: {
-              select: {
-                comments: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        favorites: {
-          include: {
-            show: {
-              select: {
-                id: true,
-                name: true,
-                artist: true,
-                date: true,
-                venue: true,
-                imageUrl: true,
-              },
-            },
-          },
-          orderBy: {
-            order: 'asc',
-          },
-          take: 5,
-        },
-        _count: {
-          select: {
-            reviews: true,
-            following: true,
-            followers: true,
-          },
-        },
-      },
-    });
+    const { data: user, error } = await supabase
+      .from('User')
+      .select(`
+        id,
+        username,
+        name,
+        bio,
+        image,
+        createdAt,
+        reviews:Review(
+          *,
+          user:User(id, username, name, image),
+          show:Show(id, name, artist, date, venue),
+          likes:ReviewLike(*),
+          comments:Comment(*)
+        ),
+        favorites:UserFavorite(
+          *,
+          show:Show(id, name, artist, date, venue, imageUrl)
+        ),
+        followers:Friendship(id),
+        following:Friendship(id)
+      `)
+      .eq('username', username)
+      .single();
 
-    if (!user) {
+    if (error || !user) {
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
       );
     }
+
+    // Format the response
+    const formattedUser = {
+      ...user,
+      reviews: (user.reviews || []).sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+      favorites: (user.favorites || []).slice(0, 5),
+      _count: {
+        reviews: user.reviews?.length || 0,
+        following: user.following?.length || 0,
+        followers: user.followers?.length || 0,
+      },
+    };
 
     // Verificar estado de amistad si hay sesión
     const session = await getServerSession(authOptions);
@@ -97,24 +69,20 @@ export async function GET(
 
       if (currentUserId !== user.id) {
         // Check if current user follows this user
-        const following = await prisma.friendship.findUnique({
-          where: {
-            followerId_followingId: {
-              followerId: currentUserId,
-              followingId: user.id,
-            },
-          },
-        });
+        const { data: following } = await supabase
+          .from('Friendship')
+          .select('status')
+          .eq('followerId', currentUserId)
+          .eq('followingId', user.id)
+          .single();
 
         // Check if this user follows current user
-        const followedBy = await prisma.friendship.findUnique({
-          where: {
-            followerId_followingId: {
-              followerId: user.id,
-              followingId: currentUserId,
-            },
-          },
-        });
+        const { data: followedBy } = await supabase
+          .from('Friendship')
+          .select('status')
+          .eq('followerId', user.id)
+          .eq('followingId', currentUserId)
+          .single();
 
         friendshipStatus = {
           isFollowing: !!following && following.status === 'accepted',
@@ -129,11 +97,11 @@ export async function GET(
     }
 
     return NextResponse.json({
-      ...user,
+      ...formattedUser,
       friendshipStatus,
     });
   } catch (error) {
-    // Log error on server-side only
+    console.error('Error fetching user:', error);
     return NextResponse.json(
       { error: 'Error al obtener usuario' },
       { status: 500 }

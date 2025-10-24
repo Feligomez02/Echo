@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from './auth';
-import { prisma } from './prisma';
+import { supabase } from './supabase';
 import { isValidCuid } from './security';
 
 /**
@@ -27,15 +27,16 @@ export async function verifyResourceOwnership(
   try {
     switch (resourceType) {
       case 'review': {
-        const review = await prisma.review.findUnique({
-          where: { id: resourceId },
-          select: { userId: true },
-        });
-        
-        if (!review) {
+        const { data: review, error } = await supabase
+          .from('Review')
+          .select('userId')
+          .eq('id', resourceId)
+          .single();
+
+        if (error || !review) {
           return { authorized: false, error: 'Review no encontrada' };
         }
-        
+
         return {
           authorized: review.userId === userId,
           userId,
@@ -44,15 +45,16 @@ export async function verifyResourceOwnership(
       }
 
       case 'comment': {
-        const comment = await prisma.comment.findUnique({
-          where: { id: resourceId },
-          select: { userId: true },
-        });
-        
-        if (!comment) {
+        const { data: comment, error } = await supabase
+          .from('Comment')
+          .select('userId')
+          .eq('id', resourceId)
+          .single();
+
+        if (error || !comment) {
           return { authorized: false, error: 'Comentario no encontrado' };
         }
-        
+
         return {
           authorized: comment.userId === userId,
           userId,
@@ -91,27 +93,25 @@ export async function verifyMutualFriendship(
       return false;
     }
 
-    const [friendship1, friendship2] = await Promise.all([
-      prisma.friendship.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId: userId1,
-            followingId: userId2,
-          },
-        },
-      }),
-      prisma.friendship.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId: userId2,
-            followingId: userId1,
-          },
-        },
-      }),
-    ]);
+    const { data: friendship1, error: error1 } = await supabase
+      .from('Friendship')
+      .select('status')
+      .eq('followerId', userId1)
+      .eq('followingId', userId2)
+      .single();
+
+    const { data: friendship2, error: error2 } = await supabase
+      .from('Friendship')
+      .select('status')
+      .eq('followerId', userId2)
+      .eq('followingId', userId1)
+      .single();
 
     return (
-      friendship1?.status === 'accepted' && friendship2?.status === 'accepted'
+      !error1 &&
+      !error2 &&
+      friendship1?.status === 'accepted' &&
+      friendship2?.status === 'accepted'
     );
   } catch (error) {
     console.error('Error verificando amistad mutua:', error);
@@ -124,13 +124,13 @@ export async function verifyMutualFriendship(
  */
 export async function getAuthenticatedUserId(): Promise<string | null> {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user) {
     return null;
   }
 
   const userId = (session.user as any).id;
-  
+
   // Validar que el ID sea válido
   if (!userId || !isValidCuid(userId)) {
     return null;
@@ -164,12 +164,12 @@ export async function checkPermission(
         }
 
         // Verificar que no tenga ya una review de este show
-        const existingReview = await prisma.review.findFirst({
-          where: {
-            userId,
-            showId: context.showId,
-          },
-        });
+        const { data: existingReview } = await supabase
+          .from('Review')
+          .select('id')
+          .eq('userId', userId)
+          .eq('showId', context.showId)
+          .single();
 
         if (existingReview) {
           return {
@@ -186,12 +186,13 @@ export async function checkPermission(
           return { allowed: false, reason: 'Review ID requerido' };
         }
 
-        const review = await prisma.review.findUnique({
-          where: { id: context.reviewId },
-          select: { userId: true },
-        });
+        const { data: review, error: reviewError } = await supabase
+          .from('Review')
+          .select('userId')
+          .eq('id', context.reviewId)
+          .single();
 
-        if (!review) {
+        if (reviewError || !review) {
           return { allowed: false, reason: 'Review no encontrada' };
         }
 

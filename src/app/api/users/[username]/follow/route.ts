@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { sanitizeUsername, checkRateLimit } from '@/lib/security';
 import { checkPermission } from '@/lib/authorization';
@@ -41,11 +41,13 @@ export async function POST(
     const sanitizedUsername = sanitizeUsername(username);
 
     // Obtener usuario a seguir
-    const targetUser = await prisma.user.findUnique({
-      where: { username: sanitizedUsername },
-    });
+    const { data: targetUser, error: userError } = await supabase
+      .from('User')
+      .select('id')
+      .eq('username', sanitizedUsername)
+      .single();
 
-    if (!targetUser) {
+    if (userError || !targetUser) {
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
@@ -68,37 +70,37 @@ export async function POST(
 
     if (action === 'follow') {
       // Crear o actualizar friendship
-      const friendship = await prisma.friendship.upsert({
-        where: {
-          followerId_followingId: {
-            followerId: currentUserId,
-            followingId: targetUser.id,
-          },
-        },
-        update: {
-          status: 'accepted',
-        },
-        create: {
+      const { data: friendship, error: createError } = await supabase
+        .from('Friendship')
+        .upsert({
           followerId: currentUserId,
           followingId: targetUser.id,
           status: 'accepted',
-        },
-      });
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }, {
+          onConflict: 'followerId,followingId'
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
 
       return NextResponse.json({ message: 'Siguiendo', friendship });
     } else {
       // Unfollow
-      await prisma.friendship.deleteMany({
-        where: {
-          followerId: currentUserId,
-          followingId: targetUser.id,
-        },
-      });
+      const { error: deleteError } = await supabase
+        .from('Friendship')
+        .delete()
+        .eq('followerId', currentUserId)
+        .eq('followingId', targetUser.id);
+
+      if (deleteError) throw deleteError;
 
       return NextResponse.json({ message: 'Dejaste de seguir' });
     }
   } catch (error) {
-    // Log error on server-side only
+    console.error('Error processing follow action:', error);
     return NextResponse.json(
       { error: 'Error al procesar acción' },
       { status: 500 }

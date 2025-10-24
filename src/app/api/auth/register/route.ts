@@ -2,7 +2,7 @@ export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import {
   sanitizeUsername,
@@ -66,11 +66,13 @@ export async function POST(request: Request) {
     }
 
     // Verificar si el email ya existe
-    const existingEmail = await prisma.user.findUnique({
-      where: { email },
-    });
+    const { data: existingEmail, error: emailError } = await supabase
+      .from('User')
+      .select('id')
+      .eq('email', email)
+      .single();
 
-    if (existingEmail) {
+    if (existingEmail && !emailError) {
       return NextResponse.json(
         { error: 'Este email ya está registrado' },
         { status: 400 }
@@ -78,11 +80,13 @@ export async function POST(request: Request) {
     }
 
     // Verificar si el username ya existe
-    const existingUsername = await prisma.user.findUnique({
-      where: { username: sanitizedUsername },
-    });
+    const { data: existingUsername, error: usernameError } = await supabase
+      .from('User')
+      .select('id')
+      .eq('username', sanitizedUsername)
+      .single();
 
-    if (existingUsername) {
+    if (existingUsername && !usernameError) {
       return NextResponse.json(
         { error: 'Este nombre de usuario ya está en uso' },
         { status: 400 }
@@ -93,21 +97,20 @@ export async function POST(request: Request) {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Crear usuario
-    const user = await prisma.user.create({
-      data: {
+    const { data: user, error: createError } = await supabase
+      .from('User')
+      .insert({
         email,
         username: sanitizedUsername,
         password: hashedPassword,
         name: sanitizedName,
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        createdAt: true,
-      },
-    });
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .select('id, email, username, name, createdAt')
+      .single();
+
+    if (createError) throw createError;
 
     return NextResponse.json(
       { message: 'Usuario creado exitosamente', user },
@@ -121,7 +124,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Log error on server-side only
+    console.error('Error creating user:', error);
     return NextResponse.json(
       { error: 'Error al crear usuario' },
       { status: 500 }

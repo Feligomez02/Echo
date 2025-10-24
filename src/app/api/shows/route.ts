@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-import { getUpcomingShows, searchShows } from '@/services/shows';
+import { supabase } from '@/lib/supabase';
 
 // GET - Obtener shows próximos en Córdoba con filtros opcionales
 export async function GET(request: Request) {
@@ -12,36 +12,53 @@ export async function GET(request: Request) {
     const artist = searchParams.get('artist');
     const source = searchParams.get('source');
 
-    let shows;
+    let query = supabase
+      .from('Show')
+      .select(`
+        *,
+        reviews:Review(id, rating, text, userId, createdAt, user:User(id, username, name, image))
+      `)
+      .gte('date', new Date().toISOString())
+      .order('date', { ascending: true })
+      .limit(200);
 
-    // Si hay búsqueda general, usar searchShows
-    if (search) {
-      shows = await searchShows(search);
+    // Apply source filter
+    if (source) {
+      query = query.eq('source', source);
     } else {
-      // Obtener todos los shows y aplicar filtros
-      shows = await getUpcomingShows(200);
-
-      // Aplicar filtros
-      if (venue) {
-        shows = shows.filter((show: any) => 
-          show.venue.toLowerCase().includes(venue.toLowerCase())
-        );
-      }
-
-      if (artist) {
-        shows = shows.filter((show: any) => 
-          show.artist.toLowerCase().includes(artist.toLowerCase()) ||
-          show.name.toLowerCase().includes(artist.toLowerCase())
-        );
-      }
-
-      if (source) {
-        shows = shows.filter((show: any) => show.source === source);
-      }
+      query = query.in('source', ['laestacion', 'lafabrica']);
     }
 
-    // Calcular rating promedio para cada show
-    const showsWithRatings = shows.map((show: any) => {
+    const { data: shows, error } = await query;
+
+    if (error) throw error;
+
+    // Apply client-side filters for search, venue, and artist
+    let filteredShows = shows || [];
+
+    if (search) {
+      filteredShows = filteredShows.filter((show: any) =>
+        show.name.toLowerCase().includes(search.toLowerCase()) ||
+        show.artist.toLowerCase().includes(search.toLowerCase()) ||
+        show.venue.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    if (venue) {
+      filteredShows = filteredShows.filter((show: any) =>
+        show.venue.toLowerCase().includes(venue.toLowerCase())
+      );
+    }
+
+    if (artist) {
+      filteredShows = filteredShows.filter((show: any) =>
+        show.artist.toLowerCase().includes(artist.toLowerCase()) ||
+        show.name.toLowerCase().includes(artist.toLowerCase())
+      );
+    }
+
+    // Calculate average rating for each show
+    const showsWithRatings = filteredShows.map((show: any) => {
       const averageRating =
         show.reviews.length > 0
           ? show.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
@@ -51,13 +68,12 @@ export async function GET(request: Request) {
       return {
         ...show,
         averageRating,
-        reviewCount: show._count.reviews,
+        reviewCount: show.reviews.length,
       };
     });
 
     return NextResponse.json(showsWithRatings);
   } catch (error) {
-    // Log error on server-side only (not exposed to client)
     console.error('Error in /api/shows:', error);
     return NextResponse.json(
       { error: 'Error al obtener shows' },

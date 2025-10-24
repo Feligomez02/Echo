@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { sanitizeHtml, checkRateLimit, isValidCuid } from '@/lib/security';
 import { checkPermission } from '@/lib/authorization';
@@ -62,23 +62,22 @@ export async function POST(
     const sanitizedText = sanitizeHtml(text);
 
     // Crear comentario
-    const comment = await prisma.comment.create({
-      data: {
+    const { data: comment, error } = await supabase
+      .from('Comment')
+      .insert({
         reviewId,
         userId,
         text: sanitizedText,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            image: true,
-          },
-        },
-      },
-    });
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .select(`
+        *,
+        user:User(id, username, name, image)
+      `)
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
@@ -89,7 +88,7 @@ export async function POST(
       );
     }
 
-    // Log error on server-side only
+    console.error('Error creating comment:', error);
     return NextResponse.json(
       { error: 'Error al crear comentario' },
       { status: 500 }

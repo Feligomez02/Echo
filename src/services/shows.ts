@@ -1,8 +1,4 @@
-import { prisma } from '@/lib/prisma';
 import { supabase } from '@/lib/supabase';
-
-// Flag to switch between Prisma and Supabase
-const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
 /**
  * Obtiene los próximos shows desde la base de datos
@@ -10,113 +6,52 @@ const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
  * Esta función es segura para usar en API Routes
  */
 export async function getUpcomingShows(limit = 100) {
-  if (USE_SUPABASE) {
-    // Supabase version
-    const { data, error } = await supabase
-      .from('Show')
-      .select(`
+  const { data, error } = await supabase
+    .from('Show')
+    .select(`
+      *,
+      reviews:Review(
         *,
-        reviews:Review(
-          *,
-          user:User(id, username, name, image),
-          likes:ReviewLike(*)
-        ),
-        reviews_count:Review(count)
-      `)
-      .gte('date', new Date().toISOString())
-      .in('source', ['laestacion', 'lafabrica'])
-      .order('date', { ascending: true })
-      .limit(limit);
+        user:User(id, username, name, image),
+        likes:ReviewLike(*)
+      )
+    `)
+    .gte('date', new Date().toISOString())
+    .in('source', ['laestacion', 'lafabrica'])
+    .order('date', { ascending: true })
+    .limit(limit);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      throw error;
-    }
-
-    return data || [];
+  if (error) {
+    console.error('Supabase error:', error);
+    throw error;
   }
 
-  // Prisma version (fallback)
-  return prisma.show.findMany({
-    where: {
-      date: {
-        gte: new Date(),
-      },
-      // Enforce whitelist: Only La Estación and La Fábrica
-      source: {
-        in: ['laestacion', 'lafabrica'],
-      },
-    },
-    include: {
-      reviews: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              name: true,
-              image: true,
-            },
-          },
-          likes: true,
-          _count: {
-            select: {
-              comments: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-      _count: {
-        select: {
-          reviews: true,
-        },
-      },
-    },
-    orderBy: {
-      date: 'asc',
-    },
-    take: limit,
-  });
+  return data || [];
 }
 
 /**
  * Obtiene un show por ID
  */
 export async function getShowById(id: string) {
-  return prisma.show.findUnique({
-    where: { id },
-    include: {
-      reviews: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              name: true,
-              image: true,
-            },
-          },
-          likes: true,
-          _count: {
-            select: {
-              comments: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-      _count: {
-        select: {
-          reviews: true,
-        },
-      },
-    },
-  });
+  const { data, error } = await supabase
+    .from('Show')
+    .select(`
+      *,
+      reviews:Review(
+        *,
+        user:User(id, username, name, image),
+        likes:ReviewLike(*)
+      )
+    `)
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw error;
+  }
+
+  return data;
 }
 
 /**
@@ -124,52 +59,27 @@ export async function getShowById(id: string) {
  * FILTERED: Only shows from whitelisted venues (La Estación & La Fábrica)
  */
 export async function searchShowsByArtist(artist: string) {
-  return prisma.show.findMany({
-    where: {
-      artist: {
-        contains: artist,
-        // Note: mode: 'insensitive' not supported in SQLite
-      },
-      date: {
-        gte: new Date(),
-      },
-      // Enforce whitelist: Only La Estación and La Fábrica
-      source: {
-        in: ['laestacion', 'lafabrica'],
-      },
-    },
-    include: {
-      reviews: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              name: true,
-              image: true,
-            },
-          },
-          likes: true,
-          _count: {
-            select: {
-              comments: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-      _count: {
-        select: {
-          reviews: true,
-        },
-      },
-    },
-    orderBy: {
-      date: 'asc',
-    },
-  });
+  const { data, error } = await supabase
+    .from('Show')
+    .select(`
+      *,
+      reviews:Review(
+        *,
+        user:User(id, username, name, image),
+        likes:ReviewLike(*)
+      )
+    `)
+    .ilike('artist', `%${artist}%`)
+    .gte('date', new Date().toISOString())
+    .in('source', ['laestacion', 'lafabrica'])
+    .order('date', { ascending: true });
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw error;
+  }
+
+  return data || [];
 }
 
 /**
@@ -177,69 +87,28 @@ export async function searchShowsByArtist(artist: string) {
  * FILTERED: Only shows from whitelisted venues (La Estación & La Fábrica)
  */
 export async function searchShows(query: string) {
-  return prisma.show.findMany({
-    where: {
-      OR: [
-        {
-          name: {
-            contains: query,
-            // Note: mode: 'insensitive' not supported in SQLite
-          },
-        },
-        {
-          artist: {
-            contains: query,
-            // Note: mode: 'insensitive' not supported in SQLite
-          },
-        },
-        {
-          venue: {
-            contains: query,
-            // Note: mode: 'insensitive' not supported in SQLite
-          },
-        },
-      ],
-      date: {
-        gte: new Date(),
-      },
-      // Enforce whitelist: Only La Estación and La Fábrica
-      source: {
-        in: ['laestacion', 'lafabrica'],
-      },
-    },
-    include: {
-      reviews: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              name: true,
-              image: true,
-            },
-          },
-          likes: true,
-          _count: {
-            select: {
-              comments: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-      _count: {
-        select: {
-          reviews: true,
-        },
-      },
-    },
-    orderBy: {
-      date: 'asc',
-    },
-    take: 50,
-  });
+  const { data, error } = await supabase
+    .from('Show')
+    .select(`
+      *,
+      reviews:Review(
+        *,
+        user:User(id, username, name, image),
+        likes:ReviewLike(*)
+      )
+    `)
+    .or(`name.ilike.%${query}%,artist.ilike.%${query}%,venue.ilike.%${query}%`)
+    .gte('date', new Date().toISOString())
+    .in('source', ['laestacion', 'lafabrica'])
+    .order('date', { ascending: true })
+    .limit(50);
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw error;
+  }
+
+  return data || [];
 }
 
 /**
@@ -247,45 +116,43 @@ export async function searchShows(query: string) {
  * FILTERED: Only shows from whitelisted venues (La Estación & La Fábrica)
  */
 export async function getScrapingStats() {
-  // Count only from whitelisted sources
-  const total = await prisma.show.count({
-    where: {
-      source: {
-        in: ['laestacion', 'lafabrica'],
-      },
-    },
-  });
-  
-  const upcoming = await prisma.show.count({
-    where: {
-      date: {
-        gte: new Date(),
-      },
-      source: {
-        in: ['laestacion', 'lafabrica'],
-      },
-    },
-  });
-  
-  const past = total - upcoming;
+  // Count total shows from whitelisted sources
+  const { count: total, error: totalError } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true })
+    .in('source', ['laestacion', 'lafabrica']);
 
-  const sources = await prisma.show.groupBy({
-    by: ['source'],
-    where: {
-      source: {
-        in: ['laestacion', 'lafabrica'],
-      },
-    },
-    _count: true,
-  });
+  // Count upcoming shows
+  const { count: upcoming, error: upcomingError } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true })
+    .gte('date', new Date().toISOString())
+    .in('source', ['laestacion', 'lafabrica']);
+
+  if (totalError || upcomingError) {
+    throw new Error('Error fetching show statistics');
+  }
+
+  const past = (total || 0) - (upcoming || 0);
+
+  // Get counts by source
+  const { data: laestacion, error: laestacionError } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true })
+    .eq('source', 'laestacion');
+
+  const { data: lafabrica, error: lafabricaError } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true })
+    .eq('source', 'lafabrica');
 
   return {
-    total,
-    upcoming,
+    total: total || 0,
+    upcoming: upcoming || 0,
     past,
-    bySources: sources.map((s: { source: string; _count: number }) => ({
-      source: s.source,
-      count: s._count,
-    })),
+    bySources: [
+      { source: 'laestacion', count: laestacion?.length || 0 },
+      { source: 'lafabrica', count: lafabrica?.length || 0 },
+    ],
   };
 }

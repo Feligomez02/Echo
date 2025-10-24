@@ -1,10 +1,10 @@
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 interface RecommendedShow {
   id: string;
   name: string;
   artist: string;
-  date: Date;
+  date: string;
   venue: string;
   imageUrl: string | null;
   ticketUrl: string | null;
@@ -14,7 +14,23 @@ interface RecommendedShow {
   reviewCount?: number;
 }
 
-type ShowWithReviews = Awaited<ReturnType<typeof prisma.show.findMany>>[0];
+interface ShowWithReviews {
+  id: string;
+  name: string;
+  artist: string;
+  date: string;
+  venue: string;
+  imageUrl: string | null;
+  ticketUrl: string | null;
+  reviews: Array<{
+    userId: string;
+    rating: number;
+    user: {
+      id: string;
+      username: string;
+    };
+  }>;
+}
 
 /**
  * Genera recomendaciones personalizadas para un usuario
@@ -27,49 +43,43 @@ export async function getRecommendationsForUser(
   userId: string
 ): Promise<RecommendedShow[]> {
   // Obtener favoritos del usuario para identificar artistas preferidos
-  const userFavorites = await prisma.userFavorite.findMany({
-    where: { userId },
-    include: {
-      show: true,
-    },
-  });
+  const { data: userFavorites } = await supabase
+    .from('UserFavorite')
+    .select(`
+      *,
+      show:Show(id, artist)
+    `)
+    .eq('userId', userId);
 
-  const favoriteArtists = userFavorites.map((fav: { show: { artist: string } }) => fav.show.artist);
+  const favoriteArtists = (userFavorites || []).map((fav: any) => fav.show.artist);
 
   // Obtener amigos mutuos (ambos se siguen)
   const mutualFriends = await getMutualFriends(userId);
-  const friendIds = mutualFriends.map((f: { id: string }) => f.id);
+  const friendIds = mutualFriends.map((f: any) => f.id);
 
   // Obtener shows futuros en Córdoba
-  const upcomingShows = await prisma.show.findMany({
-    where: {
-      date: {
-        gte: new Date(),
-      },
-      city: 'Córdoba',
-    },
-    include: {
-      reviews: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-            },
-          },
-        },
-      },
-      _count: {
-        select: {
-          reviews: true,
-        },
-      },
-    },
-  });
+  const { data: upcomingShows } = await supabase
+    .from('Show')
+    .select(`
+      id,
+      name,
+      artist,
+      date,
+      venue,
+      imageUrl,
+      ticketUrl,
+      reviews:Review(
+        userId,
+        rating,
+        user:User(id, username)
+      )
+    `)
+    .gte('date', new Date().toISOString())
+    .eq('city', 'Córdoba');
 
   // Calcular score para cada show
-  const recommendations: RecommendedShow[] = upcomingShows
-    .map((show: ShowWithReviews) => {
+  const recommendations: RecommendedShow[] = (upcomingShows || [])
+    .map((show: any) => {
       let score = 0;
       let reasons: string[] = [];
 
@@ -84,7 +94,7 @@ export async function getRecommendationsForUser(
         (review: any) =>
           friendIds.includes(review.userId) && review.rating >= 4.0
       );
-      
+
       if (friendReviews.length > 0) {
         score += friendReviews.length * 30;
         const friendUsernames = friendReviews
@@ -107,7 +117,7 @@ export async function getRecommendationsForUser(
 
       // 4. Bonus por shows muy próximos (+20 si es esta semana)
       const daysUntilShow = Math.floor(
-        (show.date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        (new Date(show.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
       if (daysUntilShow <= 7 && daysUntilShow >= 0) {
         score += 20;
@@ -132,7 +142,7 @@ export async function getRecommendationsForUser(
         score,
         reason: reasons.length > 0 ? reasons.join(' • ') : 'Show en Córdoba',
         averageRating,
-        reviewCount: show._count.reviews,
+        reviewCount: show.reviews.length,
       };
     })
     // Filtrar shows sin score (solo si tenemos suficientes con score)
@@ -144,9 +154,9 @@ export async function getRecommendationsForUser(
 
   // Si no hay suficientes recomendaciones personalizadas, agregar populares
   if (recommendations.length < 10) {
-    const popularShows = upcomingShows
-      .filter((show: ShowWithReviews) => !recommendations.find((r: RecommendedShow) => r.id === show.id))
-      .map((show: ShowWithReviews) => {
+    const popularShows = (upcomingShows || [])
+      .filter((show: any) => !recommendations.find((r: RecommendedShow) => r.id === show.id))
+      .map((show: any) => {
         const averageRating =
           show.reviews.length > 0
             ? show.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
@@ -164,7 +174,7 @@ export async function getRecommendationsForUser(
           score: show.reviews.length * 5,
           reason: 'Popular en Córdoba',
           averageRating,
-          reviewCount: show._count.reviews,
+          reviewCount: show.reviews.length,
         };
       })
       .sort((a: RecommendedShow, b: RecommendedShow) => b.score - a.score)
@@ -181,40 +191,42 @@ export async function getRecommendationsForUser(
  */
 async function getMutualFriends(userId: string) {
   // Usuarios que el userId sigue con status 'accepted'
-  const following = await prisma.friendship.findMany({
-    where: {
-      followerId: userId,
-      status: 'accepted',
-    },
-    select: {
-      followingId: true,
-    },
-  });
+  const { data: following } = await supabase
+    .from('Friendship')
+    .select('followingId')
+    .eq('followerId', userId)
+    .eq('status', 'accepted');
 
-  const followingIds = following.map((f: { followingId: string }) => f.followingId);
+  const followingIds = (following || []).map((f: any) => f.followingId);
+
+  if (followingIds.length === 0) {
+    return [];
+  }
 
   // De esos, filtrar los que también siguen a userId
-  const mutualFriends = await prisma.user.findMany({
-    where: {
-      id: {
-        in: followingIds,
-      },
-      following: {
-        some: {
-          followingId: userId,
-          status: 'accepted',
-        },
-      },
-    },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      image: true,
-    },
-  });
+  const { data: mutualFriends } = await supabase
+    .from('User')
+    .select(`
+      id,
+      username,
+      name,
+      image
+    `)
+    .in('id', followingIds);
 
-  return mutualFriends;
+  if (!mutualFriends) return [];
+
+  // Filter to only include those who also follow the user
+  const { data: reverseFollowing } = await supabase
+    .from('Friendship')
+    .select('followerId')
+    .eq('followingId', userId)
+    .eq('status', 'accepted')
+    .in('followerId', mutualFriends.map(f => f.id));
+
+  const reversFollowerIds = (reverseFollowing || []).map((f: any) => f.followerId);
+
+  return mutualFriends.filter(f => reversFollowerIds.includes(f.id));
 }
 
 /**
@@ -224,25 +236,24 @@ export async function areMutualFriends(
   userId1: string,
   userId2: string
 ): Promise<boolean> {
-  const friendship1 = await prisma.friendship.findUnique({
-    where: {
-      followerId_followingId: {
-        followerId: userId1,
-        followingId: userId2,
-      },
-    },
-  });
+  const { data: friendship1, error: error1 } = await supabase
+    .from('Friendship')
+    .select('status')
+    .eq('followerId', userId1)
+    .eq('followingId', userId2)
+    .single();
 
-  const friendship2 = await prisma.friendship.findUnique({
-    where: {
-      followerId_followingId: {
-        followerId: userId2,
-        followingId: userId1,
-      },
-    },
-  });
+  const { data: friendship2, error: error2 } = await supabase
+    .from('Friendship')
+    .select('status')
+    .eq('followerId', userId2)
+    .eq('followingId', userId1)
+    .single();
 
   return (
-    friendship1?.status === 'accepted' && friendship2?.status === 'accepted'
+    !error1 &&
+    !error2 &&
+    friendship1?.status === 'accepted' &&
+    friendship2?.status === 'accepted'
   );
 }

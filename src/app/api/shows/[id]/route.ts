@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 // GET - Obtener detalles de un show específico
 export async function GET(
@@ -10,62 +10,36 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const show = await prisma.show.findUnique({
-      where: { id },
-      include: {
-        reviews: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                name: true,
-                image: true,
-              },
-            },
-            likes: true,
-            comments: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                    name: true,
-                    image: true,
-                  },
-                },
-              },
-            },
-            _count: {
-              select: {
-                comments: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        _count: {
-          select: {
-            reviews: true,
-            favorites: true,
-          },
-        },
-      },
-    });
 
-    if (!show) {
+    const { data: show, error } = await supabase
+      .from('Show')
+      .select(`
+        *,
+        reviews:Review(
+          *,
+          user:User(id, username, name, image),
+          likes:ReviewLike(*),
+          comments:Comment(
+            *,
+            user:User(id, username, name, image)
+          )
+        ),
+        favorites:UserFavorite(id)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error || !show) {
       return NextResponse.json(
         { error: 'Show no encontrado' },
         { status: 404 }
       );
     }
 
-    // Calcular rating promedio
+    // Calculate average rating
     const averageRating =
       show.reviews.length > 0
-        ? show.reviews.reduce((sum: any, r: any) => sum + r.rating, 0) /
+        ? show.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
           show.reviews.length
         : null;
 
@@ -74,7 +48,7 @@ export async function GET(
       averageRating,
     });
   } catch (error) {
-    // Log error on server-side only
+    console.error('Error in /api/shows/[id]:', error);
     return NextResponse.json(
       { error: 'Error al obtener show' },
       { status: 500 }
