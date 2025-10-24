@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { cleanShowData, deduplicateShows, normalizeText } from '@/lib/data-cleaning';
 import { normalizeVenueName } from '@/lib/venue-dedup';
 
@@ -223,13 +223,13 @@ export async function saveScrapedShows(shows: ScrapedShow[]) {
   for (const show of shows) {
     try {
       // Buscar show existente por nombre, fecha y venue
-      const existing = await prisma.show.findFirst({
-        where: {
-          name: show.name,
-          date: show.date,
-          venue: show.venue,
-        },
-      });
+      const { data: existing } = await supabase
+        .from('Show')
+        .select('*')
+        .eq('name', show.name)
+        .eq('date', show.date)
+        .eq('venue', show.venue)
+        .single();
 
       if (existing) {
         // Actualizar si hay cambios en descripción, imagen o URL
@@ -239,27 +239,43 @@ export async function saveScrapedShows(shows: ScrapedShow[]) {
           existing.ticketUrl !== show.ticketUrl;
 
         if (needsUpdate) {
-          await prisma.show.update({
-            where: { id: existing.id },
-            data: {
+          const { error } = await supabase
+            .from('Show')
+            .update({
               description: show.description,
               imageUrl: show.imageUrl,
               ticketUrl: show.ticketUrl,
-              updatedAt: new Date(),
-            },
-          });
-          updated++;
-          console.log(`  ↻ Actualizado: ${show.name}`);
+              updatedAt: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (!error) {
+            updated++;
+            console.log(`  ↻ Actualizado: ${show.name}`);
+          } else {
+            console.error(`  ✗ Error updating show ${show.name}:`, error);
+            skipped++;
+          }
         } else {
           skipped++;
         }
       } else {
         // Crear nuevo show
-        await prisma.show.create({
-          data: show,
-        });
-        created++;
-        console.log(`  ✓ Creado: ${show.name}`);
+        const { error } = await supabase
+          .from('Show')
+          .insert({
+            ...show,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+
+        if (!error) {
+          created++;
+          console.log(`  ✓ Creado: ${show.name}`);
+        } else {
+          console.error(`  ✗ Error creating show ${show.name}:`, error);
+          skipped++;
+        }
       }
     } catch (error) {
       console.error(`  ✗ Error saving show ${show.name}:`, error);
@@ -279,88 +295,76 @@ export async function saveScrapedShows(shows: ScrapedShow[]) {
  * Obtiene shows próximos en Córdoba desde la DB
  */
 export async function getUpcomingShows(limit: number = 20) {
-  return prisma.show.findMany({
-    where: {
-      date: {
-        gte: new Date(),
-      },
-      city: 'Córdoba',
-    },
-    orderBy: {
-      date: 'asc',
-    },
-    take: limit,
-    include: {
-      reviews: {
-        select: {
-          rating: true,
-        },
-      },
-      _count: {
-        select: {
-          reviews: true,
-        },
-      },
-    },
-  });
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { data: shows } = await supabase
+    .from('Show')
+    .select('*')
+    .eq('city', 'Córdoba')
+    .gte('date', today)
+    .order('date', { ascending: true })
+    .limit(limit);
+
+  return shows || [];
 }
 
 /**
  * Busca shows por artista
  */
 export async function searchShowsByArtist(artist: string) {
-  return prisma.show.findMany({
-    where: {
-      artist: {
-        contains: artist,
-      },
-      city: 'Córdoba',
-    },
-    orderBy: {
-      date: 'asc',
-    },
-    include: {
-      reviews: {
-        select: {
-          rating: true,
-        },
-      },
-    },
-  });
+  const { data: shows } = await supabase
+    .from('Show')
+    .select('*')
+    .eq('city', 'Córdoba')
+    .ilike('artist', `%${artist}%`)
+    .order('date', { ascending: true });
+
+  return shows || [];
 }
 
 /**
  * Obtiene estadísticas de scraping
  */
 export async function getScrapingStats() {
-  const totalShows = await prisma.show.count({
-    where: { city: 'Córdoba' }
-  });
+  const { count: totalShows } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true })
+    .eq('city', 'Córdoba');
 
-  const upcomingShows = await prisma.show.count({
-    where: {
-      city: 'Córdoba',
-      date: { gte: new Date() }
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { count: upcomingShows } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true })
+    .eq('city', 'Córdoba')
+    .gte('date', today);
+
+  const { count: pastShows } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true })
+    .eq('city', 'Córdoba')
+    .lt('date', today);
+
+  const { data: shows } = await supabase
+    .from('Show')
+    .select('source')
+    .eq('city', 'Córdoba');
+
+  // Agrupar por source manualmente
+  const showsBySources = (shows || []).reduce((acc: any[], show: any) => {
+    const existing = acc.find(s => s.source === show.source);
+    if (existing) {
+      existing.count++;
+    } else {
+      acc.push({ source: show.source, count: 1 });
     }
-  });
-
-  const pastShows = await prisma.show.count({
-    where: {
-      city: 'Córdoba',
-      date: { lt: new Date() }
-    }
-  });
-
-  const showsBySources = await prisma.show.groupBy({
-    by: ['source'],
-    where: { city: 'Córdoba' },
-    _count: true
-  });
+    return acc;
+  }, []);
 
   return {
-    total: totalShows,
-    upcoming: upcomingShows,
-    past: pastShows,
+    total: totalShows || 0,
+    upcoming: upcomingShows || 0,
+    past: pastShows || 0,
     bySources: showsBySources
   };
 }

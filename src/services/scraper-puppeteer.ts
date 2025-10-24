@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
@@ -231,13 +231,13 @@ export async function saveScrapedShows(shows: ScrapedShow[]): Promise<{
   for (const show of shows) {
     try {
       // Buscar si ya existe (por nombre, fecha y venue para evitar duplicados)
-      const existing = await prisma.show.findFirst({
-        where: {
-          name: show.name,
-          date: show.date,
-          venue: show.venue,
-        },
-      });
+      const { data: existing } = await supabase
+        .from('Show')
+        .select('*')
+        .eq('name', show.name)
+        .eq('date', show.date)
+        .eq('venue', show.venue)
+        .single();
 
       if (existing) {
         // Verificar si cambió algo importante antes de actualizar
@@ -248,19 +248,26 @@ export async function saveScrapedShows(shows: ScrapedShow[]): Promise<{
           existing.ticketUrl !== show.ticketUrl;
 
         if (hasChanges) {
-          await prisma.show.update({
-            where: { id: existing.id },
-            data: {
+          const { error } = await supabase
+            .from('Show')
+            .update({
               artist: show.artist,
               description: show.description,
               city: show.city,
               imageUrl: show.imageUrl,
               ticketUrl: show.ticketUrl,
               source: show.source,
-            },
-          });
-          updated++;
-          console.log(`   ✏️  Actualizado: ${show.name} (${show.venue})`);
+              updatedAt: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (!error) {
+            updated++;
+            console.log(`   ✏️  Actualizado: ${show.name} (${show.venue})`);
+          } else {
+            skipped++;
+            console.error(`   ❌ Error actualizando "${show.name}":`, error);
+          }
         } else {
           skipped++;
           if (skipped <= 3) {
@@ -269,11 +276,21 @@ export async function saveScrapedShows(shows: ScrapedShow[]): Promise<{
         }
       } else {
         // Crear nuevo show
-        await prisma.show.create({
-          data: show,
-        });
-        created++;
-        console.log(`   ✨ Nuevo: ${show.name} (${show.venue})`);
+        const { error } = await supabase
+          .from('Show')
+          .insert({
+            ...show,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+
+        if (!error) {
+          created++;
+          console.log(`   ✨ Nuevo: ${show.name} (${show.venue})`);
+        } else {
+          console.error(`   ❌ Error guardando "${show.name}":`, error);
+          skipped++;
+        }
       }
     } catch (error) {
       console.error(`   ❌ Error guardando "${show.name}":`, error);
@@ -296,78 +313,69 @@ export async function saveScrapedShows(shows: ScrapedShow[]): Promise<{
  * Obtiene los próximos shows desde la base de datos
  */
 export async function getUpcomingShows(limit = 100) {
-  return prisma.show.findMany({
-    where: {
-      date: {
-        gte: new Date(),
-      },
-    },
-    include: {
-      reviews: {
-        select: {
-          rating: true,
-        },
-      },
-      _count: {
-        select: {
-          reviews: true,
-        },
-      },
-    },
-    orderBy: {
-      date: 'asc',
-    },
-    take: limit,
-  });
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { data: shows } = await supabase
+    .from('Show')
+    .select('*')
+    .gte('date', today)
+    .order('date', { ascending: true })
+    .limit(limit);
+
+  return shows || [];
 }
 
 /**
  * Busca shows por artista
  */
 export async function searchShowsByArtist(artist: string) {
-  return prisma.show.findMany({
-    where: {
-      artist: {
-        contains: artist,
-        // Note: mode: 'insensitive' not supported in SQLite
-        // Convert to lowercase for case-insensitive search
-      },
-      date: {
-        gte: new Date(),
-      },
-    },
-    orderBy: {
-      date: 'asc',
-    },
-  });
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { data: shows } = await supabase
+    .from('Show')
+    .select('*')
+    .ilike('artist', `%${artist}%`)
+    .gte('date', today)
+    .order('date', { ascending: true });
+
+  return shows || [];
 }
 
 /**
  * Obtiene estadísticas del scraping
  */
 export async function getScrapingStats() {
-  const total = await prisma.show.count();
-  const upcoming = await prisma.show.count({
-    where: {
-      date: {
-        gte: new Date(),
-      },
-    },
-  });
-  const past = total - upcoming;
+  const { count: total } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true });
 
-  const sources = await prisma.show.groupBy({
-    by: ['source'],
-    _count: true,
+  const today = new Date().toISOString().split('T')[0];
+  const { count: upcoming } = await supabase
+    .from('Show')
+    .select('*', { count: 'exact', head: true })
+    .gte('date', today);
+
+  const past = (total || 0) - (upcoming || 0);
+
+  const { data: shows } = await supabase
+    .from('Show')
+    .select('source');
+
+  // Agrupar por source manualmente
+  const bySources: { source: string; count: number }[] = [];
+  (shows || []).forEach(show => {
+    const existing = bySources.find(s => s.source === show.source);
+    if (existing) {
+      existing.count++;
+    } else {
+      bySources.push({ source: show.source, count: 1 });
+    }
   });
 
   return {
-    total,
-    upcoming,
+    total: total || 0,
+    upcoming: upcoming || 0,
     past,
-    bySources: sources.map((s: { source: string; _count: number }) => ({
-      source: s.source,
-      count: s._count,
-    })),
+    bySources,
   };
 }

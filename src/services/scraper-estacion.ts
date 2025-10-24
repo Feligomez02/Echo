@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { ScrapedShow } from './scraper-puppeteer';
@@ -270,13 +270,13 @@ export async function saveEstacionShows(shows: ScrapedShow[]): Promise<{
   for (const show of shows) {
     try {
       // Buscar si ya existe (por nombre, fecha y venue)
-      const existing = await prisma.show.findFirst({
-        where: {
-          name: show.name,
-          date: show.date,
-          venue: show.venue,
-        },
-      });
+      const { data: existing } = await supabase
+        .from('Show')
+        .select('*')
+        .eq('name', show.name)
+        .eq('date', show.date)
+        .eq('venue', show.venue)
+        .single();
 
       if (existing) {
         const hasChanges =
@@ -286,19 +286,25 @@ export async function saveEstacionShows(shows: ScrapedShow[]): Promise<{
           existing.ticketUrl !== show.ticketUrl;
 
         if (hasChanges) {
-          await prisma.show.update({
-            where: { id: existing.id },
-            data: {
+          const { error: updateError } = await supabase
+            .from('Show')
+            .update({
               artist: show.artist,
               description: show.description,
               city: show.city,
               imageUrl: show.imageUrl,
               ticketUrl: show.ticketUrl,
               source: show.source,
-            },
-          });
-          updated++;
-          console.log(`   ✏️  Actualizado: ${show.name}`);
+              updatedAt: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (!updateError) {
+            updated++;
+            console.log(`   ✏️  Actualizado: ${show.name}`);
+          } else {
+            throw updateError;
+          }
         } else {
           skipped++;
           if (skipped <= 3) {
@@ -306,33 +312,21 @@ export async function saveEstacionShows(shows: ScrapedShow[]): Promise<{
           }
         }
       } else {
-        // Obtener o crear la venue
-        let venue = await prisma.venue.findUnique({
-          where: { name: 'La Estación' },
-        });
-
-        if (!venue) {
-          venue = await prisma.venue.create({
-            data: {
-              name: 'La Estación',
-              city: 'Córdoba',
-              address: 'Av. Hipólito Yrigoyen 348, Córdoba',
-              website: 'https://www.laestacioncordoba.com',
-              source: 'estacion',
-              active: true,
-            },
-          });
-        }
-
-        // Crear el show con venueId
-        await prisma.show.create({
-          data: {
+        // Crear el show directamente en Supabase
+        const { error: insertError } = await supabase
+          .from('Show')
+          .insert({
             ...show,
-            venueId: venue.id,
-          },
-        });
-        created++;
-        console.log(`   ✨ Nuevo: ${show.name}`);
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+
+        if (!insertError) {
+          created++;
+          console.log(`   ✨ Nuevo: ${show.name}`);
+        } else {
+          throw insertError;
+        }
       }
     } catch (error) {
       console.error(`   ❌ Error guardando "${show.name}":`, error);

@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { ScrapedShow } from './scraper-puppeteer';
 
 /**
@@ -263,13 +263,13 @@ export async function saveTicketekShows(shows: ScrapedShow[]): Promise<{
   for (const show of shows) {
     try {
       // Buscar si ya existe (por nombre, fecha y venue para evitar duplicados)
-      const existing = await prisma.show.findFirst({
-        where: {
-          name: show.name,
-          date: show.date,
-          venue: show.venue,
-        },
-      });
+      const { data: existing } = await supabase
+        .from('Show')
+        .select('*')
+        .eq('name', show.name)
+        .eq('date', show.date)
+        .eq('venue', show.venue)
+        .single();
 
       if (existing) {
         // Verificar si cambió algo importante antes de actualizar
@@ -280,19 +280,26 @@ export async function saveTicketekShows(shows: ScrapedShow[]): Promise<{
           existing.ticketUrl !== show.ticketUrl;
 
         if (hasChanges) {
-          await prisma.show.update({
-            where: { id: existing.id },
-            data: {
+          const { error } = await supabase
+            .from('Show')
+            .update({
               artist: show.artist,
               description: show.description,
               city: show.city,
               imageUrl: show.imageUrl,
               ticketUrl: show.ticketUrl,
               source: show.source,
-            },
-          });
-          updated++;
-          console.log(`   ✏️  Actualizado: ${show.name} (${show.venue})`);
+              updatedAt: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (!error) {
+            updated++;
+            console.log(`   ✏️  Actualizado: ${show.name} (${show.venue})`);
+          } else {
+            skipped++;
+            console.error(`   ❌ Error actualizando "${show.name}":`, error);
+          }
         } else {
           skipped++;
           if (skipped <= 3) {
@@ -301,11 +308,21 @@ export async function saveTicketekShows(shows: ScrapedShow[]): Promise<{
         }
       } else {
         // Crear nuevo show
-        await prisma.show.create({
-          data: show,
-        });
-        created++;
-        console.log(`   ✨ Nuevo: ${show.name} (${show.venue})`);
+        const { error } = await supabase
+          .from('Show')
+          .insert({
+            ...show,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+
+        if (!error) {
+          created++;
+          console.log(`   ✨ Nuevo: ${show.name} (${show.venue})`);
+        } else {
+          console.error(`   ❌ Error guardando "${show.name}":`, error);
+          skipped++;
+        }
       }
     } catch (error) {
       console.error(`   ❌ Error guardando "${show.name}":`, error);
