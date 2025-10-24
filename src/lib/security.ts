@@ -1,15 +1,27 @@
 import DOMPurify from 'dompurify';
 
 /**
- * Sanitiza HTML para prevenir ataques XSS
- * Elimina scripts, iframes y otros elementos peligrosos
+ * Sanitiza input de usuario para prevenir XSS e inyecciones
+ * - Previene XSS: remueve tags HTML y event handlers
+ * - Previene inyecciones: no usa eval, no concatena SQL (Supabase usa parameterized queries)
+ * - Previene ataques: limita longitud, remueve caracteres peligrosos
  */
 export function sanitizeHtml(dirty: string): string {
-  return DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br'],
-    ALLOWED_ATTR: ['href'],
-    ALLOW_DATA_ATTR: false,
-  });
+  if (!dirty || typeof dirty !== 'string') return '';
+  
+  return dirty
+    .trim()
+    // Prevenir XSS: remover tags HTML
+    .replace(/[<>]/g, '')
+    // Prevenir event handlers: onclick=, onerror=, etc
+    .replace(/on\w+\s*=/gi, '')
+    // Prevenir javascript: URLs
+    .replace(/javascript:/gi, '')
+    .replace(/data:/gi, '')
+    // Remover caracteres de control
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Limitar longitud para prevenir DoS
+    .substring(0, 1000);
 }
 
 /**
