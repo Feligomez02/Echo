@@ -112,8 +112,9 @@ export default function ShowDetailPage() {
 
   const showDate = new Date(show.date);
   const isPastShow = showDate < new Date();
+  const reviews = show.reviews || [];
   const userReview = session
-    ? show.reviews.find((r: any) => r.user.id === (session.user as any).id)
+    ? reviews.find((r: any) => r.user.id === (session.user as any).id)
     : null;
 
   return (
@@ -255,9 +256,9 @@ export default function ShowDetailPage() {
           {/* Lista de reviews */}
           <div>
             <h3 className="text-3xl md:text-4xl font-black mb-6 text-blue-900 dark:text-blue-100 font-sans">
-              💬 REVIEWS ({show.reviews.length})
+              💬 REVIEWS ({reviews.length})
             </h3>
-            {show.reviews.length === 0 ? (
+            {reviews.length === 0 ? (
               <div className="retro-card p-8 text-center">
                 <p className="text-blue-900 dark:text-blue-100 font-sans text-lg">
                   Todavía no hay reviews para este show
@@ -270,7 +271,7 @@ export default function ShowDetailPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                {show.reviews.map((review: any) => (
+                {reviews.map((review: any) => (
                   <RetroReviewCard 
                     key={review.id} 
                     review={review}

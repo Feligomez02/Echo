@@ -11,40 +11,71 @@ export async function GET(
   try {
     const { id } = await context.params;
 
-    const { data: show, error } = await supabase
+    // Obtener el show
+    const { data: show, error: showError } = await supabase
       .from('Show')
-      .select(`
-        *,
-        reviews:Review(
-          *,
-          user:User(id, username, name, image),
-          likes:ReviewLike(*),
-          comments:Comment(
-            *,
-            user:User(id, username, name, image)
-          )
-        ),
-        favorites:UserFavorite(id)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
-    if (error || !show) {
+    if (showError || !show) {
       return NextResponse.json(
         { error: 'Show no encontrado' },
         { status: 404 }
       );
     }
 
+    // Obtener reviews con relaciones
+    const { data: reviews, error: reviewsError } = await supabase
+      .from('Review')
+      .select(`
+        id,
+        rating,
+        text,
+        userId,
+        showId,
+        createdAt,
+        updatedAt,
+        user:User(id, username, name, image),
+        likes:ReviewLike(*),
+        comments:Comment(
+          id,
+          text,
+          userId,
+          createdAt,
+          user:User(id, username, name, image)
+        )
+      `)
+      .eq('showId', id);
+
+    if (reviewsError) {
+      console.error('Error fetching reviews:', reviewsError);
+      return NextResponse.json(
+        { error: 'Error al obtener reviews' },
+        { status: 500 }
+      );
+    }
+
+    // Obtener favoritos
+    const { data: favorites, error: favError } = await supabase
+      .from('UserFavorite')
+      .select('id')
+      .eq('showId', id);
+
+    if (favError) {
+      console.error('Error fetching favorites:', favError);
+    }
+
     // Calculate average rating
     const averageRating =
-      show.reviews.length > 0
-        ? show.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
-          show.reviews.length
+      reviews && reviews.length > 0
+        ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
         : null;
 
     return NextResponse.json({
       ...show,
+      reviews: reviews || [],
+      favorites: favorites || [],
       averageRating,
     });
   } catch (error) {
