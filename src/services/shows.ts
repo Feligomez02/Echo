@@ -1,4 +1,8 @@
 import { prisma } from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
+
+// Flag to switch between Prisma and Supabase
+const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
 /**
  * Obtiene los próximos shows desde la base de datos
@@ -6,6 +10,33 @@ import { prisma } from '@/lib/prisma';
  * Esta función es segura para usar en API Routes
  */
 export async function getUpcomingShows(limit = 100) {
+  if (USE_SUPABASE) {
+    // Supabase version
+    const { data, error } = await supabase
+      .from('Show')
+      .select(`
+        *,
+        reviews:Review(
+          *,
+          user:User(id, username, name, image),
+          likes:ReviewLike(*)
+        ),
+        reviews_count:Review(count)
+      `)
+      .gte('date', new Date().toISOString())
+      .in('source', ['laestacion', 'lafabrica'])
+      .order('date', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+
+    return data || [];
+  }
+
+  // Prisma version (fallback)
   return prisma.show.findMany({
     where: {
       date: {
