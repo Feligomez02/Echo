@@ -16,8 +16,9 @@ const nextConfig = {
   // Ensure Prisma query engine is bundled for serverless deployment
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Add PrismaPlugin to copy query engine files
-      config.plugins = [...config.plugins, new PrismaPlugin()];
+      // Externalize Prisma packages - don't bundle them, load at runtime
+      config.externals = config.externals || [];
+      config.externals.push('@prisma/client', '@prisma/engines');
     }
     return config;
   },

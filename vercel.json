@@ -1,7 +1,10 @@
 {
   "framework": "nextjs",
-  "installCommand": "npm ci --legacy-peer-deps && npx prisma generate",
+  "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build",
+  "env": {
+    "PRISMA_SKIP_ENGINE_CHECK": "true"
+  },
   "functions": {
     "app/api/**/*.js": {
       "includeFiles": "node_modules/@prisma/client/**"
