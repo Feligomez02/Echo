@@ -14,6 +14,8 @@ interface RecommendedShow {
   reviewCount?: number;
 }
 
+type ShowWithReviews = Awaited<ReturnType<typeof prisma.show.findMany>>[0];
+
 /**
  * Genera recomendaciones personalizadas para un usuario
  * Basado en:
@@ -32,11 +34,11 @@ export async function getRecommendationsForUser(
     },
   });
 
-  const favoriteArtists = userFavorites.map((fav) => fav.show.artist);
+  const favoriteArtists = userFavorites.map((fav: { show: { artist: string } }) => fav.show.artist);
 
   // Obtener amigos mutuos (ambos se siguen)
   const mutualFriends = await getMutualFriends(userId);
-  const friendIds = mutualFriends.map((f) => f.id);
+  const friendIds = mutualFriends.map((f: { id: string }) => f.id);
 
   // Obtener shows futuros en Córdoba
   const upcomingShows = await prisma.show.findMany({
@@ -67,7 +69,7 @@ export async function getRecommendationsForUser(
 
   // Calcular score para cada show
   const recommendations: RecommendedShow[] = upcomingShows
-    .map((show) => {
+    .map((show: ShowWithReviews) => {
       let score = 0;
       let reasons: string[] = [];
 
@@ -79,14 +81,14 @@ export async function getRecommendationsForUser(
 
       // 2. Shows con reviews positivas de amigos (+30 puntos por amigo con 4+ estrellas)
       const friendReviews = show.reviews.filter(
-        (review) =>
+        (review: any) =>
           friendIds.includes(review.userId) && review.rating >= 4.0
       );
       
       if (friendReviews.length > 0) {
         score += friendReviews.length * 30;
         const friendUsernames = friendReviews
-          .map((r) => r.user.username)
+          .map((r: any) => r.user.username)
           .slice(0, 2);
         reasons.push(
           `Le gustó a ${friendUsernames.join(', ')}${
@@ -96,7 +98,7 @@ export async function getRecommendationsForUser(
       }
 
       // 3. Shows populares en general (+10 puntos por review con 4+)
-      const positiveReviews = show.reviews.filter((r) => r.rating >= 4.0);
+      const positiveReviews = show.reviews.filter((r: any) => r.rating >= 4.0);
       score += positiveReviews.length * 10;
 
       if (positiveReviews.length >= 3) {
@@ -115,7 +117,7 @@ export async function getRecommendationsForUser(
       // Calcular rating promedio
       const averageRating =
         show.reviews.length > 0
-          ? show.reviews.reduce((sum, r) => sum + r.rating, 0) /
+          ? show.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
             show.reviews.length
           : undefined;
 
@@ -134,20 +136,20 @@ export async function getRecommendationsForUser(
       };
     })
     // Filtrar shows sin score (solo si tenemos suficientes con score)
-    .filter((show) => show.score > 0)
+    .filter((show: RecommendedShow) => show.score > 0)
     // Ordenar por score descendente
-    .sort((a, b) => b.score - a.score)
+    .sort((a: RecommendedShow, b: RecommendedShow) => b.score - a.score)
     // Limitar a top 20
     .slice(0, 20);
 
   // Si no hay suficientes recomendaciones personalizadas, agregar populares
   if (recommendations.length < 10) {
     const popularShows = upcomingShows
-      .filter((show) => !recommendations.find((r) => r.id === show.id))
-      .map((show) => {
+      .filter((show: ShowWithReviews) => !recommendations.find((r: RecommendedShow) => r.id === show.id))
+      .map((show: ShowWithReviews) => {
         const averageRating =
           show.reviews.length > 0
-            ? show.reviews.reduce((sum, r) => sum + r.rating, 0) /
+            ? show.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
               show.reviews.length
             : undefined;
 
@@ -165,7 +167,7 @@ export async function getRecommendationsForUser(
           reviewCount: show._count.reviews,
         };
       })
-      .sort((a, b) => b.score - a.score)
+      .sort((a: RecommendedShow, b: RecommendedShow) => b.score - a.score)
       .slice(0, 10 - recommendations.length);
 
     recommendations.push(...popularShows);
@@ -189,7 +191,7 @@ async function getMutualFriends(userId: string) {
     },
   });
 
-  const followingIds = following.map((f) => f.followingId);
+  const followingIds = following.map((f: { followingId: string }) => f.followingId);
 
   // De esos, filtrar los que también siguen a userId
   const mutualFriends = await prisma.user.findMany({

@@ -146,8 +146,8 @@ export async function getDistinctVenues(): Promise<string[]> {
   });
 
   return venues
-    .map((v) => v.venue)
-    .filter((v) => v && v.length > 0)
+    .map((v: { venue: string }) => v.venue)
+    .filter((v: string) => v && v.length > 0)
     .sort();
 }
 
@@ -267,7 +267,7 @@ export async function getVenueStats() {
     },
   });
 
-  return venues.map((v) => ({
+  return venues.map((v: { venue: string; _count: number }) => ({
     name: v.venue,
     showCount: v._count,
   }));
