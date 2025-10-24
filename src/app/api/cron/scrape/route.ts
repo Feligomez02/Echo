@@ -3,12 +3,13 @@ import { NextResponse, NextRequest } from 'next/server';
 export const runtime = 'nodejs';
 
 /**
- * Vercel Cron Endpoint - Runs weekly to scrape new events
+ * Vercel Cron Endpoint - Informational only
  * 
- * Security: Only accepts requests with valid SCRAPER_API_KEY
- * Scheduled: Every Sunday at 2 AM UTC (configurable in vercel.json)
+ * Scraping is performed locally on development machine and data is pushed to Supabase.
+ * This endpoint is kept for monitoring purposes and future webhook integrations.
  * 
- * Note: Import scrapers only when needed (lazy loading to avoid build issues)
+ * Note: Puppeteer cannot run on Vercel serverless (128MB limit, no binary support).
+ * Use `npm run scrape:both` locally to update the database.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -33,50 +34,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('🎭 Starting weekly scrape...');
-    const startTime = Date.now();
-
-    // Lazy load scrapers to avoid build issues
-    const { scrapeEstacion } = await import('@/services/scraper-estacion');
-    const { scrapeFabrica } = await import('@/services/scraper-fabrica');
-
-    // Run both scrapers in parallel
-    const [estacionResults, fabricaResults] = await Promise.all([
-      scrapeEstacion().catch(err => ({
-        success: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
-        venue: 'La Estación'
-      })),
-      scrapeFabrica().catch(err => ({
-        success: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
-        venue: 'La Fábrica'
-      }))
-    ]);
-
-    const duration = Date.now() - startTime;
-
-    console.log('✅ Scraping completed', {
-      duration: `${duration}ms`
-    });
+    console.log('ℹ️ Scraper endpoint called - Puppeteer scraping must be done locally');
 
     return NextResponse.json({
       success: true,
+      message: 'Scraping is performed locally. Run "npm run scrape:both" on your development machine.',
       timestamp: new Date().toISOString(),
-      duration: `${duration}ms`,
-      results: {
-        estacion: estacionResults,
-        fabrica: fabricaResults
+      instructions: {
+        local: 'npm run scrape:both',
+        effect: 'Updates Supabase database shared between dev and production',
+        note: 'Puppeteer cannot run on Vercel serverless (128MB limit)'
       }
     });
 
   } catch (error) {
-    console.error('❌ Scraping failed:', error);
+    console.error('❌ Error:', error);
     
     return NextResponse.json(
       {
         success: false,
-        error: 'Scraping failed',
+        error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString()
       },
@@ -92,3 +69,4 @@ export async function POST() {
     { status: 405 }
   );
 }
+
