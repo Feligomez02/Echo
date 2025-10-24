@@ -1,5 +1,3 @@
-import DOMPurify from 'dompurify';
-
 /**
  * Sanitiza input de usuario para prevenir XSS e inyecciones
  * - Previene XSS: remueve tags HTML y event handlers

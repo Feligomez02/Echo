@@ -34,13 +34,22 @@ export default function ShowDetailPage() {
     if (!showId) return;
 
     fetch(`/api/shows/${showId}`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+        return res.json();
+      })
       .then((data) => {
+        if (data.error) {
+          throw new Error(data.error);
+        }
         setShow(data);
         setLoading(false);
       })
       .catch((error) => {
         console.error('Error loading show:', error);
+        setShow(null);
         setLoading(false);
       });
   }, [showId]);
@@ -71,10 +80,13 @@ export default function ShowDetailPage() {
       }
 
       // Recargar show
-      const updatedShow = await fetch(`/api/shows/${showId}`).then((r) =>
-        r.json()
-      );
-      setShow(updatedShow);
+      const updatedShowRes = await fetch(`/api/shows/${showId}`);
+      if (updatedShowRes.ok) {
+        const updatedShow = await updatedShowRes.json();
+        if (!updatedShow.error) {
+          setShow(updatedShow);
+        }
+      }
 
       // Reset form
       setReviewForm({ rating: 0, text: '' });

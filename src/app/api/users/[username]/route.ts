@@ -13,50 +13,83 @@ export async function GET(
   try {
     const { username } = await context.params;
 
-    const { data: user, error } = await supabase
+    // Get user
+    const { data: user, error: userError } = await supabase
       .from('User')
-      .select(`
-        id,
-        username,
-        name,
-        bio,
-        image,
-        createdAt,
-        reviews:Review(
-          *,
-          user:User(id, username, name, image),
-          show:Show(id, name, artist, date, venue),
-          likes:ReviewLike(*),
-          comments:Comment(*)
-        ),
-        favorites:UserFavorite(
-          *,
-          show:Show(id, name, artist, date, venue, imageUrl)
-        ),
-        followers:Friendship(id),
-        following:Friendship(id)
-      `)
+      .select('*')
       .eq('username', username)
       .single();
 
-    if (error || !user) {
+    if (userError || !user) {
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
       );
     }
 
+    // Get user's reviews
+    const { data: reviews, error: reviewsError } = await supabase
+      .from('Review')
+      .select(`
+        id,
+        rating,
+        text,
+        userId,
+        showId,
+        createdAt,
+        updatedAt,
+        user:User(id, username, name, image),
+        show:Show(id, name, artist, date, venue),
+        likes:ReviewLike(*),
+        comments:Comment(
+          id,
+          text,
+          userId,
+          createdAt,
+          user:User(id, username, name, image)
+        )
+      `)
+      .eq('userId', user.id)
+      .order('createdAt', { ascending: false });
+
+    if (reviewsError) {
+      console.error('Error fetching reviews:', reviewsError);
+    }
+
+    // Get user's favorites
+    const { data: favorites, error: favError } = await supabase
+      .from('UserFavorite')
+      .select(`
+        *,
+        show:Show(id, name, artist, date, venue, imageUrl)
+      `)
+      .eq('userId', user.id)
+      .limit(5);
+
+    if (favError) {
+      console.error('Error fetching favorites:', favError);
+    }
+
+    // Get followers/following counts
+    const { data: followers } = await supabase
+      .from('Friendship')
+      .select('id')
+      .eq('followingId', user.id);
+
+    const { data: following } = await supabase
+      .from('Friendship')
+      .select('id')
+      .eq('followerId', user.id);
+
     // Format the response
     const formattedUser = {
       ...user,
-      reviews: (user.reviews || []).sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ),
-      favorites: (user.favorites || []).slice(0, 5),
+      reviews: reviews || [],
+      favorites: favorites || [],
       _count: {
-        reviews: user.reviews?.length || 0,
-        following: user.following?.length || 0,
-        followers: user.followers?.length || 0,
+        reviews: reviews?.length || 0,
+        following: following?.length || 0,
+        followers: followers?.length || 0,
       },
     };
 
@@ -69,7 +102,7 @@ export async function GET(
 
       if (currentUserId !== user.id) {
         // Check if current user follows this user
-        const { data: following } = await supabase
+        const { data: isFollowing } = await supabase
           .from('Friendship')
           .select('status')
           .eq('followerId', currentUserId)
@@ -77,7 +110,7 @@ export async function GET(
           .single();
 
         // Check if this user follows current user
-        const { data: followedBy } = await supabase
+        const { data: isFollowedBy } = await supabase
           .from('Friendship')
           .select('status')
           .eq('followerId', user.id)
@@ -85,13 +118,13 @@ export async function GET(
           .single();
 
         friendshipStatus = {
-          isFollowing: !!following && following.status === 'accepted',
-          isFollowedBy: !!followedBy && followedBy.status === 'accepted',
+          isFollowing: !!isFollowing && isFollowing.status === 'accepted',
+          isFollowedBy: !!isFollowedBy && isFollowedBy.status === 'accepted',
           isMutual:
-            !!following &&
-            following.status === 'accepted' &&
-            !!followedBy &&
-            followedBy.status === 'accepted',
+            !!isFollowing &&
+            isFollowing.status === 'accepted' &&
+            !!isFollowedBy &&
+            isFollowedBy.status === 'accepted',
         };
       }
     }
