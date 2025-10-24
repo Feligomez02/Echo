@@ -42,6 +42,8 @@
     ".next",
     ".turbo",
     "dist",
-    "out"
+    "out",
+    "src/scripts/**/*",
+    "scripts/**/*"
   ]
 }
