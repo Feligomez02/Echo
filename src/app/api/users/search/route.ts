@@ -28,8 +28,6 @@ export async function GET(request: NextRequest) {
         image,
         bio,
         createdAt,
-        followers:Friendship(id,followerId),
-        following:Friendship(id,followingId),
         reviews:Review(id)
       `)
       .or(`username.ilike.%${query}%,name.ilike.%${query}%`)
@@ -37,6 +35,27 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
+
+    // Get followers/following counts separately for each user
+    let usersWithCounts = users || [];
+    
+    for (let user of usersWithCounts) {
+      const { count: followersCount } = await supabase
+        .from('Friendship')
+        .select('*', { count: 'exact', head: true })
+        .eq('followingId', user.id);
+
+      const { count: followingCount } = await supabase
+        .from('Friendship')
+        .select('*', { count: 'exact', head: true })
+        .eq('followerId', user.id);
+
+      user._count = {
+        followers: followersCount || 0,
+        following: followingCount || 0,
+        reviews: 0,
+      };
+    }
 
     // Contar total de resultados
     const { count: total, error: countError } = await supabase
@@ -47,16 +66,16 @@ export async function GET(request: NextRequest) {
     if (countError) throw countError;
 
     // Format response
-    const formattedUsers = (users || []).map(user => ({
+    const formattedUsers = usersWithCounts.map(user => ({
       id: user.id,
       username: user.username,
       name: user.name,
       image: user.image,
       bio: user.bio,
       createdAt: user.createdAt,
-      _count: {
-        followers: user.followers?.length || 0,
-        following: user.following?.length || 0,
+      _count: (user as any)._count || {
+        followers: 0,
+        following: 0,
         reviews: user.reviews?.length || 0,
       },
     }));
