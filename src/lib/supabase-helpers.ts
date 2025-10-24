@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'crypto'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -70,9 +71,11 @@ export async function getUserByUsername(username: string) {
 }
 
 export async function createReview(userId: string, showId: string, rating: number, text: string) {
+  const reviewId = randomUUID();
   const { data, error } = await supabase
     .from('Review')
     .insert({
+      id: reviewId,
       userId,
       showId,
       rating,
@@ -87,9 +90,11 @@ export async function createReview(userId: string, showId: string, rating: numbe
 }
 
 export async function addReviewLike(userId: string, reviewId: string, isLike: boolean) {
+  const likeId = randomUUID();
   const { data, error } = await supabase
     .from('ReviewLike')
     .upsert({
+      id: likeId,
       userId,
       reviewId,
       isLike,
@@ -104,9 +109,11 @@ export async function addReviewLike(userId: string, reviewId: string, isLike: bo
 }
 
 export async function addComment(userId: string, reviewId: string, text: string) {
+  const commentId = randomUUID();
   const { data, error } = await supabase
     .from('Comment')
     .insert({
+      id: commentId,
       userId,
       reviewId,
       text,
@@ -120,9 +127,11 @@ export async function addComment(userId: string, reviewId: string, text: string)
 }
 
 export async function followUser(followerId: string, followingId: string) {
+  const friendshipId = randomUUID();
   const { data, error } = await supabase
     .from('Friendship')
     .upsert({
+      id: friendshipId,
       followerId,
       followingId,
       status: 'accepted',

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { generateUUID } from '@/lib/uuid';
 import { z } from 'zod';
 import { sanitizeUsername, checkRateLimit } from '@/lib/security';
 import { checkPermission } from '@/lib/authorization';
@@ -70,9 +71,11 @@ export async function POST(
 
     if (action === 'follow') {
       // Crear o actualizar friendship
+      const friendshipId = generateUUID();
       const { data: friendship, error: createError } = await supabase
         .from('Friendship')
         .upsert({
+          id: friendshipId,
           followerId: currentUserId,
           followingId: targetUser.id,
           status: 'accepted',

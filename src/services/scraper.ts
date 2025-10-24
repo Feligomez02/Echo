@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { randomUUID } from 'crypto';
 import { cleanShowData, deduplicateShows, normalizeText } from '@/lib/data-cleaning';
 import { normalizeVenueName } from '@/lib/venue-dedup';
 
@@ -261,9 +262,11 @@ export async function saveScrapedShows(shows: ScrapedShow[]) {
         }
       } else {
         // Crear nuevo show
+        const showId = randomUUID();
         const { error } = await supabase
           .from('Show')
           .insert({
+            id: showId,
             ...show,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),

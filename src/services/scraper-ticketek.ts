@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { ScrapedShow } from './scraper-puppeteer';
+import { randomUUID } from 'crypto';
 
 /**
  * Interface para eventos de Ticketek (estructura real de la API)
@@ -308,9 +309,11 @@ export async function saveTicketekShows(shows: ScrapedShow[]): Promise<{
         }
       } else {
         // Crear nuevo show
+        const showId = randomUUID();
         const { error } = await supabase
           .from('Show')
           .insert({
+            id: showId,
             ...show,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),

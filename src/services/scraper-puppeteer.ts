@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { randomUUID } from 'crypto';
 
 // Lazy-load puppeteer to avoid loading heavy dependencies at module import time
 // This file only defines interfaces and types, puppeteer is loaded when functions are called
@@ -280,9 +281,11 @@ export async function saveScrapedShows(shows: ScrapedShow[]): Promise<{
         }
       } else {
         // Crear nuevo show
+        const showId = randomUUID();
         const { error } = await supabase
           .from('Show')
           .insert({
+            id: showId,
             ...show,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),

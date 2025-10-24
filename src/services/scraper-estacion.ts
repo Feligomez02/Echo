@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { ScrapedShow } from './scraper-puppeteer';
+import { randomUUID } from 'crypto';
 
 /**
  * Scrapea eventos de La Estación Córdoba
@@ -316,9 +317,11 @@ export async function saveEstacionShows(shows: ScrapedShow[]): Promise<{
         }
       } else {
         // Crear el show directamente en Supabase
+        const showId = randomUUID();
         const { error: insertError } = await supabase
           .from('Show')
           .insert({
+            id: showId,
             ...show,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
